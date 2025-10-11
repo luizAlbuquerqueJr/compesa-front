@@ -115,15 +115,45 @@ class WaterMonitorApp {
 
                 // Atualizar última atualização
                 const updateElement = document.getElementById('lastUpdate');
-                if (updateElement && latestData.updated_at) {
-                    const lastUpdate = new Date(latestData.updated_at);
-                    if (!isNaN(lastUpdate.getTime())) {
-                        updateElement.textContent = `Atualizado ${firebaseService.formatRelativeTime(lastUpdate)}`;
+                if (updateElement) {
+                    console.log('Dados completos recebidos:', latestData);
+                    
+                    let lastUpdate;
+                    
+                    // Tentar encontrar timestamp nos dados
+                    if (latestData.timestamp) {
+                        console.log('Usando timestamp:', latestData.timestamp);
+                        lastUpdate = new Date(parseInt(latestData.timestamp));
+                    } else if (latestData.updated_at) {
+                        console.log('Usando updated_at:', latestData.updated_at);
+                        if (typeof latestData.updated_at === 'string') {
+                            lastUpdate = new Date(latestData.updated_at);
+                        } else if (latestData.updated_at.seconds) {
+                            lastUpdate = new Date(latestData.updated_at.seconds * 1000);
+                        } else if (typeof latestData.updated_at === 'number') {
+                            lastUpdate = new Date(latestData.updated_at);
+                        }
+                    } else if (latestData.t) {
+                        console.log('Usando t:', latestData.t);
+                        lastUpdate = new Date(parseInt(latestData.t));
                     } else {
-                        updateElement.textContent = 'Atualizado recentemente';
+                        console.log('Nenhum campo de data encontrado, usando data atual');
+                        lastUpdate = new Date();
                     }
-                } else if (updateElement) {
-                    updateElement.textContent = 'Aguardando dados...';
+                    
+                    console.log('Data final processada:', lastUpdate);
+                    
+                    if (lastUpdate && !isNaN(lastUpdate.getTime())) {
+                        const day = String(lastUpdate.getDate()).padStart(2, '0');
+                        const month = String(lastUpdate.getMonth() + 1).padStart(2, '0');
+                        const year = lastUpdate.getFullYear();
+                        const hours = String(lastUpdate.getHours()).padStart(2, '0');
+                        const minutes = String(lastUpdate.getMinutes()).padStart(2, '0');
+                        updateElement.textContent = `${day}/${month}/${year} às ${hours}:${minutes}`;
+                    } else {
+                        console.error('Data ainda inválida:', lastUpdate);
+                        updateElement.textContent = 'Aguardando dados...';
+                    }
                 }
             }
         } catch (error) {
