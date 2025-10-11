@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Caixa D'Água - Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚰 Monitor Caixa D'Água</h1>
+            <div class="status-card">
+                <div class="current-level">
+                    <span class="level-value" id="currentLevel">--</span>
+                    <span class="level-unit">%</span>
+                </div>
+                <div class="last-update" id="lastUpdate">Carregando...</div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Controles do Gráfico -->
+            <section class="controls">
+                <div class="time-selector">
+                    <button class="time-btn active" data-period="24h">24 Horas</button>
+                    <button class="time-btn" data-period="7d">7 Dias</button>
+                    <button class="time-btn" data-period="30d">30 Dias</button>
+                    <button class="time-btn" data-period="all">Todos</button>
+                </div>
+                
+                <div class="chart-options">
+                    <label>
+                        <input type="checkbox" id="showCompesaEvents" checked>
+                        Mostrar chegadas da COMPESA
+                    </label>
+                    <label>
+                        <input type="checkbox" id="showTrendLine">
+                        Linha de tendência
+                    </label>
+                </div>
+            </section>
+
+            <!-- Gráfico Principal -->
+            <section class="chart-section">
+                <div class="chart-container">
+                    <canvas id="waterChart"></canvas>
+                </div>
+                <div class="loading" id="chartLoading">
+                    <div class="spinner"></div>
+                    <p>Carregando dados...</p>
+                </div>
+            </section>
+
+            <!-- Estatísticas -->
+            <section class="stats">
+                <div class="stat-card">
+                    <h3>Última COMPESA</h3>
+                    <p id="lastCompesa">--</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Próxima Prevista</h3>
+                    <p id="nextCompesa">--</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Nível Médio (7d)</h3>
+                    <p id="avgLevel">--%</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total de Eventos</h3>
+                    <p id="totalEvents">--</p>
+                </div>
+            </section>
+
+            <!-- Histórico de Eventos -->
+            <section class="events-section">
+                <h2>📋 Histórico de Chegadas da COMPESA</h2>
+                <div class="events-list" id="eventsList">
+                    <div class="loading">Carregando eventos...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>🔄 Atualização automática a cada 30 segundos</p>
+            <p>📊 Dados em tempo real do ESP8266</p>
+        </footer>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="firebase-service.js"></script>
+    <script src="chart-manager.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
