@@ -83,10 +83,13 @@ class FirebaseService {
     async getHistoricalData(period = '24h') {
         const cacheKey = `historical_${period}`;
         
-        // Verificar cache (válido por 1 minuto)
+        // Para "all", usar cache mais longo (5 minutos) pois são mais dados
+        const cacheTimeout = period === 'all' ? 300000 : 60000;
+        
+        // Verificar cache
         if (this.cache.has(cacheKey)) {
             const cached = this.cache.get(cacheKey);
-            if (Date.now() - cached.timestamp < 60000) {
+            if (Date.now() - cached.timestamp < cacheTimeout) {
                 return cached.data;
             }
         }
@@ -100,8 +103,12 @@ class FirebaseService {
                 startTime = now - (periodConfig.hours * 60 * 60 * 1000);
             }
 
-            const data = await this.fetchSensorReadings(startTime, now);
+            // Para "all", não limitar por endTime
+            const endTime = periodConfig.hours ? now : null;
+            const data = await this.fetchSensorReadings(startTime, endTime);
+            console.log(`[${period}] Dados brutos: ${data.length}, Intervalo: ${periodConfig.pointInterval}h`);
             const processedData = this.processSensorData(data, periodConfig.pointInterval);
+            console.log(`[${period}] Dados processados: ${processedData.length}`);
 
             // Armazenar no cache
             this.cache.set(cacheKey, {
@@ -128,7 +135,9 @@ class FirebaseService {
             if (!dateData) return readings;
 
             // Processar cada data
+            console.log(`Datas disponíveis no Firebase: ${Object.keys(dateData).join(', ')}`);
             for (const [date, timestamps] of Object.entries(dateData)) {
+                let dateCount = 0;
                 for (const [timestamp, data] of Object.entries(timestamps)) {
                     const timestampMs = parseInt(timestamp);
                     
@@ -145,9 +154,13 @@ class FirebaseService {
                             date: dateObj,
                             dateStr: date
                         });
+                        dateCount++;
                     } else {
                         console.warn('Timestamp inválido ignorado:', timestamp, timestampMs);
                     }
+                }
+                if (dateCount > 0) {
+                    console.log(`Data ${date}: ${dateCount} leituras`);
                 }
             }
 
@@ -163,6 +176,16 @@ class FirebaseService {
     // Processar dados do sensor para o gráfico
     processSensorData(readings, intervalHours = 1) {
         if (!readings.length) return [];
+
+        // Para intervalos muito grandes ou poucos dados, mostrar todos
+        if (readings.length <= 50 || intervalHours >= 24) {
+            return readings.map(reading => ({
+                x: reading.timestamp,
+                y: reading.percentage,
+                date: reading.date,
+                formatted: this.formatDateTime(reading.date)
+            }));
+        }
 
         const intervalMs = intervalHours * 60 * 60 * 1000;
         const processed = [];
@@ -383,6 +406,7 @@ class FirebaseService {
     // Limpar cache
     clearCache() {
         this.cache.clear();
+        console.log('Cache do Firebase limpo');
     }
 }
 

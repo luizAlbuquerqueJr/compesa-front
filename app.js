@@ -269,6 +269,11 @@ class WaterMonitorApp {
     async changePeriod(period) {
         if (period === this.currentPeriod) return;
 
+        // Limpar cache se mudando para "all" para garantir dados frescos
+        if (period === 'all') {
+            firebaseService.clearCache();
+        }
+
         // Atualizar botões
         document.querySelectorAll('.time-btn').forEach(btn => {
             btn.classList.remove('active');

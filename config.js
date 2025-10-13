@@ -54,7 +54,7 @@ const appConfig = {
         'all': {
             label: 'Todos os Dados',
             hours: null,
-            pointInterval: 24 // 24 horas
+            pointInterval: 1 // 1 hora - máximo de pontos
         }
     },
     
