@@ -17,6 +17,68 @@ class FirebaseService {
         }
     }
 
+    // Obter dados da última chegada da COMPESA
+    async getLastCompesaData() {
+        try {
+            const snapshot = await this.database.ref('latest').once('value');
+            const data = snapshot.val();
+            
+            if (data && data.last_compesa_timestamp) {
+                return {
+                    timestamp: parseInt(data.last_compesa_timestamp),
+                    datetime: data.last_compesa_datetime,
+                    level: data.last_compesa_level,
+                    date: new Date(parseInt(data.last_compesa_timestamp))
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error('Erro ao buscar dados da última COMPESA:', error);
+            return null;
+        }
+    }
+
+    // Obter histórico de chegadas da COMPESA
+    async getCompesaArrivals(limit = 10) {
+        try {
+            const arrivals = [];
+            const arrivalsRef = this.database.ref('compesa_arrivals');
+            const snapshot = await arrivalsRef.once('value');
+            const dateData = snapshot.val();
+
+            if (!dateData) return arrivals;
+
+            // Processar cada data
+            for (const [date, timestamps] of Object.entries(dateData)) {
+                for (const [timestamp, data] of Object.entries(timestamps)) {
+                    const timestampMs = parseInt(timestamp);
+                    const dateObj = new Date(timestampMs);
+                    
+                    if (!isNaN(dateObj.getTime()) && timestampMs > 0) {
+                        arrivals.push({
+                            timestamp: timestampMs,
+                            date: dateObj,
+                            dateStr: date,
+                            previousLevel: data.previous_level,
+                            newLevel: data.new_level,
+                            increase: data.increase,
+                            datetime: data.datetime,
+                            formatted: this.formatDateTime(dateObj)
+                        });
+                    }
+                }
+            }
+
+            // Ordenar por timestamp (mais recente primeiro) e limitar
+            arrivals.sort((a, b) => b.timestamp - a.timestamp);
+            return limit > 0 ? arrivals.slice(0, limit) : arrivals;
+        } catch (error) {
+            console.error('Erro ao buscar chegadas da COMPESA:', error);
+            return [];
+        }
+    }
+
+
     // Obter dados históricos por período
     async getHistoricalData(period = '24h') {
         const cacheKey = `historical_${period}`;
@@ -154,8 +216,7 @@ class FirebaseService {
             return {
                 avgLevel: 0,
                 lastCompesa: null,
-                nextCompesa: null,
-                totalEvents: 0
+                nextCompesa: null
             };
         }
 
@@ -185,8 +246,7 @@ class FirebaseService {
         return {
             avgLevel: Math.round(avgLevel * 10) / 10,
             lastCompesa,
-            nextCompesa,
-            totalEvents: events.length
+            nextCompesa
         };
     }
 

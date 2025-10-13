@@ -164,6 +164,8 @@ class WaterMonitorApp {
     // Atualizar estatísticas
     async updateStatistics() {
         try {
+            // Buscar dados da última COMPESA do Firebase
+            const lastCompesaData = await firebaseService.getLastCompesaData();
             const data = await firebaseService.getHistoricalData('30d');
             const events = firebaseService.detectCompesaEvents(data);
             const stats = firebaseService.calculateStats(data, events);
@@ -174,24 +176,36 @@ class WaterMonitorApp {
                 avgElement.textContent = `${stats.avgLevel}%`;
             }
 
-            // Última COMPESA
+            // Última COMPESA - usar dados do Firebase se disponível
             const lastCompesaElement = document.getElementById('lastCompesa');
             if (lastCompesaElement) {
-                if (stats.lastCompesa) {
+                if (lastCompesaData) {
+                    lastCompesaElement.textContent = firebaseService.formatDateTime(lastCompesaData.date);
+                } else if (stats.lastCompesa) {
                     lastCompesaElement.textContent = firebaseService.formatRelativeTime(stats.lastCompesa.date);
                 } else {
-                    lastCompesaElement.textContent = 'Nenhum evento detectado';
+                    lastCompesaElement.textContent = 'Ainda não detectada';
                 }
             }
 
-            // Próxima COMPESA
+            // Próxima COMPESA - calcular baseado na última + 2 dias
             const nextCompesaElement = document.getElementById('nextCompesa');
             if (nextCompesaElement) {
-                if (stats.nextCompesa && stats.nextCompesa instanceof Date && !isNaN(stats.nextCompesa.getTime())) {
+                let nextCompesaDate = null;
+                
+                if (lastCompesaData) {
+                    // Usar dados do Firebase + 2 dias
+                    nextCompesaDate = new Date(lastCompesaData.date.getTime() + (2 * 24 * 60 * 60 * 1000));
+                } else if (stats.lastCompesa) {
+                    // Fallback para dados detectados + 2 dias
+                    nextCompesaDate = new Date(stats.lastCompesa.date.getTime() + (2 * 24 * 60 * 60 * 1000));
+                }
+                
+                if (nextCompesaDate && !isNaN(nextCompesaDate.getTime())) {
                     const now = new Date();
-                    if (stats.nextCompesa > now) {
+                    if (nextCompesaDate > now) {
                         // Calcular tempo até a próxima
-                        const diff = stats.nextCompesa - now;
+                        const diff = nextCompesaDate - now;
                         const hours = Math.floor(diff / (1000 * 60 * 60));
                         const days = Math.floor(hours / 24);
                         
@@ -213,11 +227,6 @@ class WaterMonitorApp {
                 }
             }
 
-            // Total de eventos
-            const totalEventsElement = document.getElementById('totalEvents');
-            if (totalEventsElement) {
-                totalEventsElement.textContent = stats.totalEvents;
-            }
 
         } catch (error) {
             console.error('Erro ao atualizar estatísticas:', error);
@@ -227,30 +236,27 @@ class WaterMonitorApp {
     // Atualizar lista de eventos
     async updateEventsList() {
         try {
-            const data = await firebaseService.getHistoricalData('all');
-            const events = firebaseService.detectCompesaEvents(data);
+            // Usar os novos dados de chegadas da COMPESA
+            const compesaArrivals = await firebaseService.getCompesaArrivals(20);
             
             const eventsList = document.getElementById('eventsList');
             if (!eventsList) return;
 
-            if (events.length === 0) {
-                eventsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 20px;">Nenhum evento da COMPESA detectado ainda.</p>';
+            if (compesaArrivals.length === 0) {
+                eventsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 20px;">Nenhuma chegada da COMPESA detectada ainda.</p>';
                 return;
             }
-
-            // Mostrar apenas os últimos 20 eventos
-            const recentEvents = events.slice(-20).reverse();
             
-            eventsList.innerHTML = recentEvents.map(event => `
+            eventsList.innerHTML = compesaArrivals.map(arrival => `
                 <div class="event-item fade-in">
                     <div>
-                        <div class="event-date">${firebaseService.formatDateTime(event.date)}</div>
+                        <div class="event-date">${arrival.formatted}</div>
                         <div class="event-details">
-                            ${firebaseService.formatRelativeTime(event.date)} • 
-                            Aumento de ${event.increase.toFixed(1)}%
+                            ${firebaseService.formatRelativeTime(arrival.date)} • 
+                            Aumento de ${arrival.increase}% (${arrival.previousLevel}% → ${arrival.newLevel}%)
                         </div>
                     </div>
-                    <div class="event-level">${event.newLevel.toFixed(1)}%</div>
+                    <div class="event-level">${arrival.newLevel}%</div>
                 </div>
             `).join('');
 
