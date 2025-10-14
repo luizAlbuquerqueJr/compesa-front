@@ -253,7 +253,7 @@ class FirebaseService {
         // Último evento da COMPESA
         const lastCompesa = events.length > 0 ? events[events.length - 1] : null;
 
-        // Próxima COMPESA estimada (48h após a última)
+        // Próxima COMPESA estimada (72h após a última)
         let nextCompesa = null;
         if (lastCompesa && lastCompesa.timestamp && !isNaN(lastCompesa.timestamp)) {
             const expectedInterval = appConfig.compesa.expectedInterval * 60 * 60 * 1000;
@@ -306,19 +306,7 @@ class FirebaseService {
                 return 'Data inválida';
             }
             
-            // Tentar usar Intl.DateTimeFormat
-            if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
-                return new Intl.DateTimeFormat('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'America/Sao_Paulo'
-                }).format(date);
-            }
-            
-            // Fallback manual
+            // Usar formatação manual para garantir formato dd/mm/yyyy
             return this.formatDateManual(date);
         } catch (error) {
             console.warn('Erro ao formatar data:', error);
@@ -333,15 +321,7 @@ class FirebaseService {
                 return 'Data inválida';
             }
             
-            if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
-                return new Intl.DateTimeFormat('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    timeZone: 'America/Sao_Paulo'
-                }).format(date);
-            }
-            
+            // Usar formatação manual para garantir formato dd/mm/yyyy
             return this.formatDateManual(date, false);
         } catch (error) {
             console.warn('Erro ao formatar data:', error);

@@ -69,7 +69,7 @@ const appConfig = {
         // Variação mínima para detectar chegada de água (%)
         minIncrease: 5,
         // Intervalo esperado entre chegadas (horas)
-        expectedInterval: 48
+        expectedInterval: 72
     }
 };
 

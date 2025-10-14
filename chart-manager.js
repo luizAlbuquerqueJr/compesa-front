@@ -329,12 +329,14 @@ class ChartManager {
             } else if (diffHours < 168) {
                 return date.toLocaleDateString('pt-BR', { 
                     day: '2-digit', 
-                    month: '2-digit' 
+                    month: '2-digit',
+                    year: 'numeric'
                 });
             } else {
                 return date.toLocaleDateString('pt-BR', { 
+                    day: '2-digit',
                     month: '2-digit', 
-                    year: '2-digit' 
+                    year: 'numeric'
                 });
             }
         } catch (error) {

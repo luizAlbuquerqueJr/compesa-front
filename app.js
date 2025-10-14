@@ -188,37 +188,29 @@ class WaterMonitorApp {
                 }
             }
 
-            // Próxima COMPESA - calcular baseado na última + 2 dias
+            // Próxima COMPESA - calcular baseado na última + 3 dias
             const nextCompesaElement = document.getElementById('nextCompesa');
             if (nextCompesaElement) {
                 let nextCompesaDate = null;
                 
                 if (lastCompesaData) {
-                    // Usar dados do Firebase + 2 dias
-                    nextCompesaDate = new Date(lastCompesaData.date.getTime() + (2 * 24 * 60 * 60 * 1000));
+                    // Usar dados do Firebase + 3 dias
+                    nextCompesaDate = new Date(lastCompesaData.date.getTime() + (3 * 24 * 60 * 60 * 1000));
                 } else if (stats.lastCompesa) {
-                    // Fallback para dados detectados + 2 dias
-                    nextCompesaDate = new Date(stats.lastCompesa.date.getTime() + (2 * 24 * 60 * 60 * 1000));
+                    // Fallback para dados detectados + 3 dias
+                    nextCompesaDate = new Date(stats.lastCompesa.date.getTime() + (3 * 24 * 60 * 60 * 1000));
                 }
                 
                 if (nextCompesaDate && !isNaN(nextCompesaDate.getTime())) {
                     const now = new Date();
                     if (nextCompesaDate > now) {
-                        // Calcular tempo até a próxima
-                        const diff = nextCompesaDate - now;
-                        const hours = Math.floor(diff / (1000 * 60 * 60));
-                        const days = Math.floor(hours / 24);
-                        
-                        if (days > 0) {
-                            nextCompesaElement.textContent = `Em ${days} dia${days > 1 ? 's' : ''}`;
-                        } else if (hours > 0) {
-                            nextCompesaElement.textContent = `Em ${hours} hora${hours > 1 ? 's' : ''}`;
-                        } else {
-                            nextCompesaElement.textContent = 'Em breve';
-                        }
+                        // Mostrar apenas a data no formato dd/mm/yyyy
+                        const formattedDate = firebaseService.formatDate(nextCompesaDate);
+                        nextCompesaElement.textContent = formattedDate;
                         nextCompesaElement.style.color = '';
                     } else {
-                        nextCompesaElement.textContent = 'Atrasada';
+                        const formattedDate = firebaseService.formatDate(nextCompesaDate);
+                        nextCompesaElement.textContent = formattedDate;
                         nextCompesaElement.style.color = '#e74c3c';
                     }
                 } else {
