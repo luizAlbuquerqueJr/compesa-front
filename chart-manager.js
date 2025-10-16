@@ -17,6 +17,7 @@ class ChartManager {
         this.showTrendLine = false;
         this.data = [];
         this.events = [];
+        this.compesaArrivals = [];
         
         // Verificar se Chart.js está disponível
         if (typeof Chart === 'undefined') {
@@ -24,11 +25,68 @@ class ChartManager {
         }
         
         this.initChart();
+        
+        // Forçar tamanho pequeno dos pontos após inicialização
+        this.forceSmallPoints();
     }
 
     // Inicializar gráfico
     initChart() {
         const config = appConfig.chart;
+        
+        // Plugin para desenhar linhas verticais da COMPESA
+        const verticalLinesPlugin = {
+            id: 'verticalLines',
+            afterDraw: (chart) => {
+                if (!this.showCompesaEvents || !this.compesaArrivals.length) {
+                    console.log('🚫 Linhas verticais não desenhadas:', {
+                        showCompesaEvents: this.showCompesaEvents,
+                        arrivalsCount: this.compesaArrivals.length
+                    });
+                    return;
+                }
+                
+                console.log('✅ Desenhando linhas verticais para', this.compesaArrivals.length, 'chegadas');
+                
+                const ctx = chart.ctx;
+                const chartArea = chart.chartArea;
+                const xScale = chart.scales.x;
+                
+                ctx.save();
+                
+                this.compesaArrivals.forEach((arrival, index) => {
+                    const x = xScale.getPixelForValue(arrival.timestamp);
+                    
+                    if (x >= chartArea.left && x <= chartArea.right) {
+                        // Linha vertical
+                        ctx.strokeStyle = 'blue';
+                        ctx.lineWidth = 3;
+                        ctx.setLineDash([8, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(x, chartArea.top);
+                        ctx.lineTo(x, chartArea.bottom);
+                        ctx.stroke();
+                        
+                        // Texto indicativo
+                        ctx.fillStyle = 'blue';
+                        ctx.font = 'bold 11px Arial';
+                        ctx.textAlign = 'center';
+                        
+                        // Alternar posição do texto para evitar sobreposição
+                        const textY = chartArea.top - (index % 2 === 0 ? 8 : 20);
+                        ctx.fillText('💧 COMPESA', x, textY);
+                        
+                        // // Adicionar informação do aumento
+                        // if (arrival.increase) {
+                        //     ctx.font = '9px Arial';
+                        //     ctx.fillText(`+${arrival.increase.toFixed(1)}%`, x, textY + 12);
+                        // }
+                    }
+                });
+                
+                ctx.restore();
+            }
+        };
         
         this.chart = new Chart(this.ctx, {
             type: 'line',
@@ -42,18 +100,25 @@ class ChartManager {
                     pointBackgroundColor: config.pointBackgroundColor,
                     pointBorderColor: config.pointBorderColor,
                     pointBorderWidth: config.pointBorderWidth,
-                    pointRadius: config.pointRadius,
-                    pointHoverRadius: config.pointHoverRadius,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
                     fill: true,
                     tension: 0.4
                 }]
             },
+            plugins: [verticalLinesPlugin],
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: {
                     intersect: false,
                     mode: 'index'
+                },
+                elements: {
+                    point: {
+                        radius: 4,
+                        hoverRadius: 6
+                    }
                 },
                 plugins: {
                     title: {
@@ -63,11 +128,15 @@ class ChartManager {
                             size: 18,
                             weight: 'bold'
                         },
-                        color: '#2c3e50'
+                        color: '#2c3e50',
+                        padding: {
+                            bottom: 20
+                        }
                     },
                     legend: {
                         display: true,
-                        position: 'top'
+                        position: 'bottom',
+                        align: 'center'
                     },
                     tooltip: {
                         backgroundColor: 'rgba(44, 62, 80, 0.9)',
@@ -144,6 +213,17 @@ class ChartManager {
         });
     }
 
+    // Forçar pontos pequenos
+    forceSmallPoints() {
+        if (this.chart && this.chart.data.datasets) {
+            this.chart.data.datasets.forEach(dataset => {
+                dataset.pointRadius = 4;
+                dataset.pointHoverRadius = 6;
+            });
+            this.chart.update('none');
+        }
+    }
+
     // Atualizar dados do gráfico
     async updateChart(period = '24h') {
         this.currentPeriod = period;
@@ -155,6 +235,11 @@ class ChartManager {
             
             // Detectar eventos da COMPESA
             this.events = firebaseService.detectCompesaEvents(this.data);
+            
+            // Buscar chegadas da COMPESA do Firebase
+            const allArrivals = await firebaseService.getCompesaArrivals(0); // 0 = todos os dados
+            this.compesaArrivals = this.filterArrivalsByPeriod(allArrivals, period);
+            console.log(`📊 Chegadas da COMPESA encontradas para ${period}:`, this.compesaArrivals.length);
 
             // Atualizar datasets
             this.updateDatasets();
@@ -162,11 +247,27 @@ class ChartManager {
             // Atualizar gráfico
             this.chart.update('active');
             
+            // Garantir que os pontos permaneçam pequenos
+            this.forceSmallPoints();
+            
         } catch (error) {
             console.error('Erro ao atualizar gráfico:', error);
         } finally {
             this.showLoading(false);
         }
+    }
+
+    // Filtrar chegadas da COMPESA por período
+    filterArrivalsByPeriod(arrivals, period) {
+        if (!arrivals.length || period === 'all') return arrivals;
+        
+        const periodConfig = appConfig.periods[period];
+        if (!periodConfig.hours) return arrivals;
+        
+        const now = Date.now();
+        const startTime = now - (periodConfig.hours * 60 * 60 * 1000);
+        
+        return arrivals.filter(arrival => arrival.timestamp >= startTime);
     }
 
     // Atualizar datasets do gráfico
@@ -183,8 +284,8 @@ class ChartManager {
             pointBackgroundColor: this.data.map(point => this.getPointColor(point.y)),
             pointBorderColor: appConfig.chart.pointBorderColor,
             pointBorderWidth: appConfig.chart.pointBorderWidth,
-            pointRadius: appConfig.chart.pointRadius,
-            pointHoverRadius: appConfig.chart.pointHoverRadius,
+            pointRadius: 4,
+            pointHoverRadius: 6,
             fill: true,
             tension: 0.4
         });
@@ -279,7 +380,8 @@ class ChartManager {
     toggleCompesaEvents(show) {
         this.showCompesaEvents = show;
         this.updateDatasets();
-        this.chart.update('none');
+        this.chart.update('active'); // Usar 'active' para redesenhar as linhas verticais
+        this.forceSmallPoints();
     }
 
     // Alternar linha de tendência
@@ -287,6 +389,7 @@ class ChartManager {
         this.showTrendLine = show;
         this.updateDatasets();
         this.chart.update('none');
+        this.forceSmallPoints();
     }
 
     // Formatar data para tooltip

@@ -22,8 +22,8 @@ const appConfig = {
         pointBackgroundColor: '#3498db',
         pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6,
+        pointRadius: 2,
+        pointHoverRadius: 4,
         
         // Cores para eventos da COMPESA
         compesaEventColor: '#e74c3c',
