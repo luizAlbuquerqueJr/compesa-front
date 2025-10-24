@@ -7,6 +7,8 @@
     <link rel="icon" type="image/png" href="img1.png">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
@@ -47,8 +49,19 @@
 
             <!-- Gráfico Principal -->
             <section class="chart-section">
+                <div class="chart-header">
+                    <h2>Gráfico do Nível da Caixa D'Água</h2>
+                    <div class="zoom-controls">
+                        <button id="zoomIn" class="zoom-btn" title="Zoom In">🔍+</button>
+                        <button id="zoomOut" class="zoom-btn" title="Zoom Out">🔍-</button>
+                        <button id="resetZoom" class="zoom-btn" title="Reset Zoom">🔄</button>
+                    </div>
+                </div>
                 <div class="chart-container">
                     <canvas id="waterChart"></canvas>
+                </div>
+                <div class="chart-instructions">
+                    <p><strong>💡 Dica:</strong> Use os botões acima ou gestos de toque para dar zoom. No mobile: belisque para zoom, arraste para navegar.</p>
                 </div>
                 <div class="loading" id="chartLoading">
                     <div class="spinner"></div>

@@ -234,7 +234,7 @@ class FirebaseService {
     }
 
     // Calcular estatísticas
-    calculateStats(readings, events) {
+    calculateStats(readings, events, period = '7d') {
         if (!readings.length) {
             return {
                 avgLevel: 0,
@@ -243,11 +243,9 @@ class FirebaseService {
             };
         }
 
-        // Nível médio dos últimos 7 dias
-        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-        const recentReadings = readings.filter(r => r.timestamp >= sevenDaysAgo);
-        const avgLevel = recentReadings.length > 0 
-            ? recentReadings.reduce((sum, r) => sum + r.percentage, 0) / recentReadings.length
+        // Nível médio dos dados fornecidos (baseado no período atual)
+        const avgLevel = readings.length > 0 
+            ? readings.reduce((sum, r) => sum + r.y, 0) / readings.length
             : 0;
 
         // Último evento da COMPESA

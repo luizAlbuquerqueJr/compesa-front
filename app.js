@@ -90,6 +90,9 @@ class WaterMonitorApp {
         // Carregar dados mais recentes
         await this.updateCurrentLevel();
         
+        // Atualizar label inicial do nível médio
+        this.updateAverageLevelLabel(this.currentPeriod);
+        
         // Carregar gráfico
         await this.chartManager.updateChart(this.currentPeriod);
         
@@ -166,9 +169,10 @@ class WaterMonitorApp {
         try {
             // Buscar dados da última COMPESA do Firebase
             const lastCompesaData = await firebaseService.getLastCompesaData();
-            const data = await firebaseService.getHistoricalData('30d');
+            // Usar o período atual para calcular estatísticas
+            const data = await firebaseService.getHistoricalData(this.currentPeriod);
             const events = firebaseService.detectCompesaEvents(data);
-            const stats = firebaseService.calculateStats(data, events);
+            const stats = firebaseService.calculateStats(data, events, this.currentPeriod);
 
             // Nível médio
             const avgElement = document.getElementById('avgLevel');
@@ -275,8 +279,32 @@ class WaterMonitorApp {
         // Atualizar período atual
         this.currentPeriod = period;
 
+        // Atualizar texto do nível médio para refletir o período atual
+        this.updateAverageLevelLabel(period);
+
         // Atualizar gráfico
         await this.chartManager.updateChart(period);
+        
+        // Atualizar estatísticas com o novo período
+        await this.updateStatistics();
+    }
+
+    // Atualizar label do nível médio baseado no período
+    updateAverageLevelLabel(period) {
+        // Encontrar o card que contém o elemento avgLevel
+        const avgLevelElement = document.getElementById('avgLevel');
+        if (avgLevelElement) {
+            const avgLevelCard = avgLevelElement.parentElement.querySelector('h3');
+            if (avgLevelCard) {
+                const periodLabels = {
+                    '24h': '24 Horas',
+                    '7d': '7 Dias', 
+                    '30d': '30 Dias',
+                    'all': 'Todos os Dados'
+                };
+                avgLevelCard.textContent = `Nível Médio (${periodLabels[period] || period})`;
+            }
+        }
     }
 
     // Obter classe CSS para nível

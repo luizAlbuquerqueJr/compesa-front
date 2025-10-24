@@ -24,7 +24,18 @@ class ChartManager {
             throw new Error('Chart.js não está carregado');
         }
         
+        // Registrar plugin de zoom
+        if (typeof Chart.register === 'function' && typeof zoomPlugin !== 'undefined') {
+            Chart.register(zoomPlugin);
+            console.log('✅ Plugin de zoom registrado');
+        } else {
+            console.warn('⚠️ Plugin de zoom não encontrado');
+        }
+        
         this.initChart();
+        
+        // Configurar controles de zoom
+        this.setupZoomControls();
         
         // Forçar tamanho pequeno dos pontos após inicialização
         this.forceSmallPoints();
@@ -60,7 +71,7 @@ class ChartManager {
                     if (x >= chartArea.left && x <= chartArea.right) {
                         // Linha vertical
                         ctx.strokeStyle = 'blue';
-                        ctx.lineWidth = 3;
+                        ctx.lineWidth = 1;
                         ctx.setLineDash([8, 4]);
                         ctx.beginPath();
                         ctx.moveTo(x, chartArea.top);
@@ -72,8 +83,8 @@ class ChartManager {
                         ctx.font = 'bold 11px Arial';
                         ctx.textAlign = 'center';
                         
-                        // Alternar posição do texto para evitar sobreposição
-                        const textY = chartArea.top - (index % 2 === 0 ? 8 : 20);
+                        // Alternar posição do texto para evitar sobreposição (dentro da área do gráfico)
+                        const textY = chartArea.top - 8;
                         ctx.fillText('💧 COMPESA', x, textY);
                         
                         // // Adicionar informação do aumento
@@ -110,6 +121,11 @@ class ChartManager {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 30 // Espaço extra no topo para o texto da COMPESA
+                    }
+                },
                 interaction: {
                     intersect: false,
                     mode: 'index'
@@ -122,15 +138,33 @@ class ChartManager {
                 },
                 plugins: {
                     title: {
-                        display: true,
-                        text: 'Histórico do Nível da Caixa D\'Água',
-                        font: {
-                            size: 18,
-                            weight: 'bold'
+                        display: false // Removido pois agora temos o título no HTML
+                    },
+                    zoom: {
+                        pan: {
+                            enabled: true,
+                            mode: 'x',
+                            modifierKey: null,
+                            onPanComplete: function({chart}) {
+                                console.log('📱 Pan realizado');
+                            }
                         },
-                        color: '#2c3e50',
-                        padding: {
-                            bottom: 20
+                        zoom: {
+                            wheel: {
+                                enabled: true,
+                                speed: 0.1
+                            },
+                            pinch: {
+                                enabled: true
+                            },
+                            mode: 'x',
+                            onZoomComplete: function({chart}) {
+                                console.log('🔍 Zoom realizado');
+                            }
+                        },
+                        limits: {
+                            x: {min: 'original', max: 'original'},
+                            y: {min: 0, max: 100}
                         }
                     },
                     legend: {
@@ -188,7 +222,7 @@ class ChartManager {
                         beginAtZero: true,
                         max: 100,
                         title: {
-                            display: true,
+                            display: false,
                             text: 'Nível (%)',
                             font: {
                                 size: 14,
@@ -246,6 +280,9 @@ class ChartManager {
             
             // Atualizar gráfico
             this.chart.update('active');
+            
+            // Resetar zoom ao mudar período
+            this.resetZoom(true);
             
             // Garantir que os pontos permaneçam pequenos
             this.forceSmallPoints();
@@ -460,6 +497,55 @@ class ChartManager {
         if (this.chart) {
             this.chart.destroy();
             this.chart = null;
+        }
+    }
+
+    // Configurar controles de zoom
+    setupZoomControls() {
+        const zoomInBtn = document.getElementById('zoomIn');
+        const zoomOutBtn = document.getElementById('zoomOut');
+        const resetZoomBtn = document.getElementById('resetZoom');
+
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => this.zoomIn());
+        }
+
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => this.zoomOut());
+        }
+
+        if (resetZoomBtn) {
+            resetZoomBtn.addEventListener('click', () => this.resetZoom());
+        }
+
+        console.log('⚙️ Controles de zoom configurados');
+    }
+
+    // Zoom in
+    zoomIn() {
+        if (this.chart) {
+            this.chart.zoom(1.2);
+            console.log('🔍 Zoom in aplicado');
+        }
+    }
+
+    // Zoom out
+    zoomOut() {
+        if (this.chart) {
+            this.chart.zoom(0.8);
+            console.log('🔍 Zoom out aplicado');
+        }
+    }
+
+    // Reset zoom
+    resetZoom(auto = false) {
+        if (this.chart) {
+            this.chart.resetZoom();
+            if (auto) {
+                console.log('🔄 Zoom resetado automaticamente (mudança de período)');
+            } else {
+                console.log('🔄 Zoom resetado');
+            }
         }
     }
 }
