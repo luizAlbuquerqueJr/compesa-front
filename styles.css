@@ -469,6 +469,12 @@ header h1 {
     transition: background-color 0.3s ease;
 }
 
+.event-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .event-item:hover {
     background-color: #f8f9fa;
 }
@@ -492,7 +498,36 @@ header h1 {
     color: white;
     padding: 5px 12px;
     border-radius: 20px;
+    font-size: 0.9rem;
     font-weight: 600;
+    min-width: 60px;
+    text-align: center;
+}
+
+.delete-event-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    opacity: 0.8;
+}
+
+.delete-event-btn:hover {
+    background: #c0392b;
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.delete-event-btn:active {
+    transform: scale(0.95);
 }
 
 /* Footer */
@@ -621,8 +656,302 @@ footer p {
         padding: 4px 10px;
     }
     
+    .delete-event-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+        min-width: 36px;
+        min-height: 36px;
+    }
+    
+    .mark-card-content {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+    
+    .mark-actions {
+        min-width: auto;
+    }
+    
+    .confirm-mark-btn, .cancel-mark-btn {
+        padding: 14px 16px;
+        font-size: 16px;
+        min-height: 44px;
+    }
+    
     .stats {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Card de marcação da COMPESA */
+.compesa-mark-card {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid #3498db;
+    border-radius: 12px;
+    margin: 15px 0;
+    padding: 0;
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+    animation: slideDown 0.3s ease-out;
+}
+
+.mark-card-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    gap: 20px;
+}
+
+.mark-info h4 {
+    color: #2c3e50;
+    margin: 0 0 12px 0;
+    font-size: 1.1rem;
+}
+
+.mark-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mark-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #7f8c8d;
+    min-width: 80px;
+}
+
+.detail-value {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.mark-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 200px;
+}
+
+.confirm-mark-btn {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.confirm-mark-btn:hover {
+    background: linear-gradient(135deg, #2980b9, #1f5f8b);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.cancel-mark-btn {
+    background: #95a5a6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.cancel-mark-btn:hover {
+    background: #7f8c8d;
+    transform: translateY(-1px);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Instruções responsivas */
+.desktop-only {
+    display: inline;
+}
+
+.mobile-only {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .desktop-only {
+        display: none;
+    }
+    
+    .mobile-only {
+        display: inline;
+    }
+}
+
+/* Dialog de confirmação da bomba */
+.pump-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeInOverlay 0.3s ease-out;
+}
+
+.pump-dialog {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    width: 90%;
+    animation: slideInDialog 0.3s ease-out;
+}
+
+.pump-dialog-header {
+    padding: 20px 20px 0 20px;
+    text-align: center;
+}
+
+.pump-dialog-header h3 {
+    color: #2c3e50;
+    margin: 0;
+    font-size: 1.3rem;
+}
+
+.pump-dialog-content {
+    padding: 20px;
+    text-align: center;
+}
+
+.pump-dialog-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60px;
+}
+
+.pump-dialog-icon img {
+    max-width: 48px;
+    max-height: 48px;
+    object-fit: contain;
+}
+
+.pump-dialog-content p {
+    color: #7f8c8d;
+    font-size: 1rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.pump-dialog-actions {
+    display: flex;
+    gap: 10px;
+    padding: 0 20px 20px 20px;
+}
+
+.pump-dialog-btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.pump-dialog-btn-cancel {
+    background: #95a5a6;
+    color: white;
+}
+
+.pump-dialog-btn-cancel:hover {
+    background: #7f8c8d;
+    transform: translateY(-2px);
+}
+
+.pump-dialog-btn-confirm {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+}
+
+.pump-dialog-btn-confirm:hover {
+    background: linear-gradient(135deg, #2980b9, #1f5f8b);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.pump-dialog-btn-confirm.danger {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+.pump-dialog-btn-confirm.danger:hover {
+    background: linear-gradient(135deg, #c0392b, #a93226);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
+@keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInDialog {
+    from { 
+        opacity: 0; 
+        transform: scale(0.8) translateY(-20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: scale(1) translateY(0); 
+    }
+}
+
+/* Responsivo para mobile */
+@media (max-width: 768px) {
+    .pump-dialog {
+        width: 95%;
+        margin: 20px;
+    }
+    
+    .pump-dialog-actions {
+        flex-direction: column;
+    }
+    
+    .pump-dialog-btn {
+        min-height: 44px;
+        font-size: 16px;
     }
 }
 

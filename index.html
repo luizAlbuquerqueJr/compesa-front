@@ -39,6 +39,10 @@
                         <span class="status-label">Última ativação:</span>
                         <span class="status-value" id="pumpLastActivation">--</span>
                     </div>
+                    <div class="status-item">
+                        <span class="status-label">Duração:</span>
+                        <span class="status-value" id="pumpDuration">--</span>
+                    </div>
                 </div>
                 
                 <div class="pump-controls">
@@ -72,6 +76,10 @@
                         <input type="checkbox" id="showTrendLine">
                         Linha de tendência
                     </label>
+                    <label>
+                        <input type="checkbox" id="autoUpdateEnabled" checked>
+                        Atualização automática
+                    </label>
                 </div>
             </section>
 
@@ -89,8 +97,41 @@
                     <canvas id="waterChart"></canvas>
                 </div>
                 <div class="chart-instructions">
-                    <p><strong>💡 Dica:</strong> Use os botões acima ou gestos de toque para dar zoom. No mobile: belisque para zoom, arraste para navegar.</p>
+                    <p><strong>💡 Dica:</strong> Use os botões acima ou gestos para zoom. <span class="desktop-only">Desktop: Shift+scroll para zoom, Shift+arrastar para navegar.</span> <span class="mobile-only">Mobile: belisque para zoom, arraste para navegar.</span></p>
+                    <p id="adminChartInstructions" style="display: none; color: #e74c3c; font-weight: bold; margin-top: 8px;">🔧 <strong>Modo Admin:</strong> Clique em qualquer ponto do gráfico para marcar chegada da COMPESA</p>
                 </div>
+                
+                <!-- Card de marcação da COMPESA -->
+                <div class="compesa-mark-card" id="compesaMarkCard" style="display: none;">
+                    <div class="mark-card-content">
+                        <div class="mark-info">
+                            <h4>📍 Ponto Selecionado</h4>
+                            <div class="mark-details">
+                                <div class="mark-detail-item">
+                                    <span class="detail-label">📅 Data/Hora:</span>
+                                    <span class="detail-value" id="markDateTime">--</span>
+                                </div>
+                                <div class="mark-detail-item">
+                                    <span class="detail-label">💧 Nível:</span>
+                                    <span class="detail-value" id="markLevel">--%</span>
+                                </div>
+                                <div class="mark-detail-item">
+                                    <span class="detail-label">📈 Aumento:</span>
+                                    <span class="detail-value" id="markIncrease">+0.0%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mark-actions">
+                            <button id="confirmCompesaMark" class="confirm-mark-btn">
+                                🚰 Marcar como Chegada da COMPESA
+                            </button>
+                            <button id="cancelCompesaMark" class="cancel-mark-btn">
+                                ❌ Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="loading" id="chartLoading">
                     <div class="spinner"></div>
                     <p>Carregando dados...</p>
@@ -126,6 +167,27 @@
             <p>🔄 Atualização automática a cada 30 segundos</p>
             <p>📊 Dados em tempo real do ESP8266</p>
         </footer>
+    </div>
+
+    <!-- Dialog de confirmação da bomba -->
+    <div class="pump-dialog-overlay" id="pumpDialogOverlay" style="display: none;">
+        <div class="pump-dialog">
+            <div class="pump-dialog-header">
+                <h3 id="pumpDialogTitle">Confirmar Ação</h3>
+            </div>
+            <div class="pump-dialog-content">
+                <div class="pump-dialog-icon" id="pumpDialogIcon">💧</div>
+                <p id="pumpDialogMessage">Deseja realmente executar esta ação?</p>
+            </div>
+            <div class="pump-dialog-actions">
+                <button id="pumpDialogCancel" class="pump-dialog-btn pump-dialog-btn-cancel">
+                    ❌ Cancelar
+                </button>
+                <button id="pumpDialogConfirm" class="pump-dialog-btn pump-dialog-btn-confirm">
+                    ✅ Confirmar
+                </button>
+            </div>
+        </div>
     </div>
 
     <script src="config.js"></script>

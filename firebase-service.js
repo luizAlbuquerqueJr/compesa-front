@@ -596,6 +596,119 @@ class FirebaseService {
         const day = String(now.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     }
+
+    // Excluir evento da COMPESA
+    async deleteCompesaEvent(timestamp, dateStr) {
+        try {
+            console.log(`🗑️ Excluindo evento da COMPESA: ${timestamp} (${dateStr})`);
+            
+            // Excluir do Firebase
+            const eventPath = `compesa_arrivals/${dateStr}/${timestamp}`;
+            await firebase.database().ref(eventPath).remove();
+            
+            // Buscar todas as chegadas restantes para atualizar latest
+            const allArrivals = await this.getCompesaArrivals(0); // 0 = sem limite
+            
+            if (allArrivals.length > 0) {
+                // Pegar o evento mais recente
+                const latestArrival = allArrivals[0]; // já vem ordenado por timestamp desc
+                
+                // Atualizar latest com o último evento restante
+                const latestData = {
+                    last_compesa_level: latestArrival.newLevel,
+                    last_compesa_timestamp: latestArrival.timestamp,
+                    last_compesa_datetime: latestArrival.formatted
+                };
+                
+                await firebase.database().ref('latest').update(latestData);
+                console.log('✅ Latest atualizado com último evento restante:', latestData);
+            } else {
+                // Se não há mais eventos, limpar latest
+                const latestData = {
+                    last_compesa_level: null,
+                    last_compesa_timestamp: null,
+                    last_compesa_datetime: null
+                };
+                
+                await firebase.database().ref('latest').update(latestData);
+                console.log('✅ Latest limpo - nenhum evento restante');
+            }
+            
+            console.log('✅ Evento da COMPESA excluído com sucesso');
+            return { success: true };
+            
+        } catch (error) {
+            console.error('❌ Erro ao excluir evento da COMPESA:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Salvar chegada manual da COMPESA
+    async saveManualCompesaArrival(arrivalData) {
+        try {
+            const dateStr = this.getCurrentDate(arrivalData.timestamp);
+            
+            console.log(`💾 Salvando chegada manual da COMPESA: ${dateStr}/${arrivalData.timestamp}`);
+            
+            // Salvar em compesa_arrivals/YYYY-MM-DD/timestamp
+            const arrivalPath = `compesa_arrivals/${dateStr}/${arrivalData.timestamp}`;
+            await firebase.database().ref(arrivalPath).set(arrivalData);
+            
+            // Atualizar latest com esta chegada se for a mais recente
+            const latestData = await this.getLatestData();
+            const currentLastTimestamp = latestData?.last_compesa_timestamp || 0;
+            
+            if (arrivalData.timestamp > currentLastTimestamp) {
+                const latestUpdate = {
+                    last_compesa_level: arrivalData.new_level,
+                    last_compesa_timestamp: arrivalData.timestamp,
+                    last_compesa_datetime: arrivalData.datetime
+                };
+                
+                await firebase.database().ref('latest').update(latestUpdate);
+                console.log('✅ Latest atualizado com chegada manual:', latestUpdate);
+            }
+            
+            console.log('✅ Chegada manual da COMPESA salva com sucesso');
+            return { success: true, timestamp: arrivalData.timestamp, data: arrivalData };
+            
+        } catch (error) {
+            console.error('❌ Erro ao salvar chegada manual da COMPESA:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Buscar última ativação da bomba com duração
+    async getLastPumpActivationWithDuration() {
+        try {
+            const snapshot = await firebase.database().ref('pump_activations').orderByChild('timestamp').limitToLast(20).once('value');
+            const data = snapshot.val();
+            
+            if (!data) return null;
+
+            let lastActivationWithDuration = null;
+            
+            // Percorrer todas as datas e timestamps para encontrar a última com duração
+            Object.keys(data).forEach(date => {
+                const dayData = data[date];
+                Object.keys(dayData).forEach(timestamp => {
+                    const activation = dayData[timestamp];
+                    // Buscar ativações que foram desligadas (têm duração)
+                    if (activation.action === 'activated' && activation.duration_string) {
+                        if (!lastActivationWithDuration || activation.timestamp > lastActivationWithDuration.timestamp) {
+                            lastActivationWithDuration = activation;
+                        }
+                    }
+                });
+            });
+
+            return lastActivationWithDuration;
+            
+        } catch (error) {
+            console.error('❌ Erro ao buscar última ativação com duração:', error);
+            return null;
+        }
+    }
 }
 
 // Instância global do serviço

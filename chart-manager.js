@@ -20,6 +20,9 @@ class ChartManager {
         this.events = [];
         this.compesaArrivals = [];
         this.pumpActivations = [];
+        this.isAdminMode = false;
+        this.selectedPoint = null;
+        this.shiftPressed = false;
         
         // Carregar ícone da bomba
         this.pumpIcon = new Image();
@@ -48,13 +51,24 @@ class ChartManager {
         // Configurar controles de zoom
         this.setupZoomControls();
         
+        // Configurar zoom customizado para desktop
+        this.setupCustomZoom();
+        
         // Forçar tamanho pequeno dos pontos após inicialização
         this.forceSmallPoints();
+    }
+
+    // Detectar se é dispositivo móvel
+    isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+               ('ontouchstart' in window) || 
+               (navigator.maxTouchPoints > 0);
     }
 
     // Inicializar gráfico
     initChart() {
         const config = appConfig.chart;
+        const isMobile = this.isMobileDevice();
         
         // Plugin para desenhar linhas verticais da COMPESA e Bomba
         const verticalLinesPlugin = {
@@ -68,7 +82,7 @@ class ChartManager {
                 
                 // Linhas da COMPESA
                 if (this.showCompesaEvents && this.compesaArrivals.length) {
-                    console.log('✅ Desenhando linhas verticais para', this.compesaArrivals.length, 'chegadas da COMPESA');
+                    
                     
                     this.compesaArrivals.forEach((arrival, index) => {
                         const x = xScale.getPixelForValue(arrival.timestamp);
@@ -110,7 +124,7 @@ class ChartManager {
                 if (this.showPumpEvents && this.pumpActivations.length) {
                     const activations = this.pumpActivations.filter(pump => pump.action === 'activated');
                     const deactivations = this.pumpActivations.filter(pump => pump.action === 'deactivated');
-                    console.log('✅ Desenhando linhas verticais para', activations.length, 'acionamentos e', deactivations.length, 'desligamentos da bomba');
+                    
                     
                     // Linhas verdes para acionamentos (ligar bomba)
                     activations.forEach((activation, index) => {
@@ -233,6 +247,11 @@ class ChartManager {
                     intersect: false,
                     mode: 'index'
                 },
+                onClick: (event, elements) => {
+                    if (this.isAdminMode) {
+                        this.handleChartClick(event, elements);
+                    }
+                },
                 elements: {
                     point: {
                         radius: 4,
@@ -247,22 +266,27 @@ class ChartManager {
                         pan: {
                             enabled: true,
                             mode: 'x',
-                            modifierKey: null,
+                            modifierKey: isMobile ? null : 'shift',
                             onPanComplete: function({chart}) {
                                 console.log('📱 Pan realizado');
                             }
                         },
                         zoom: {
                             wheel: {
-                                enabled: true,
-                                speed: 0.1
+                                enabled: isMobile ? true : false, // Desabilitar wheel zoom no desktop
+                                speed: 0.3
+                            },
+                            drag: {
+                                enabled: false
                             },
                             pinch: {
                                 enabled: true
                             },
                             mode: 'x',
+                            scaleMode: 'x',
                             onZoomComplete: function({chart}) {
-                                console.log('🔍 Zoom realizado');
+                                const device = isMobile ? 'mobile' : 'desktop';
+                                console.log(`🔍 Zoom realizado no ${device}`);
                             }
                         },
                         limits: {
@@ -637,6 +661,13 @@ class ChartManager {
             this.chart.destroy();
             this.chart = null;
         }
+        
+        // Limpar event listeners customizados
+        if (!this.isMobileDevice()) {
+            document.removeEventListener('keydown', this.handleKeyDown);
+            document.removeEventListener('keyup', this.handleKeyUp);
+            this.canvas.removeEventListener('wheel', this.handleWheel);
+        }
     }
 
     // Configurar controles de zoom
@@ -658,6 +689,70 @@ class ChartManager {
         }
 
         console.log('⚙️ Controles de zoom configurados');
+    }
+
+    // Configurar zoom customizado para desktop
+    setupCustomZoom() {
+        if (this.isMobileDevice()) {
+            console.log('📱 Dispositivo móvel detectado - usando zoom nativo');
+            return;
+        }
+
+        // Armazenar referências dos handlers para poder remover depois
+        this.handleKeyDown = (e) => {
+            if (e.key === 'Shift') {
+                this.shiftPressed = true;
+            }
+        };
+
+        this.handleKeyUp = (e) => {
+            if (e.key === 'Shift') {
+                this.shiftPressed = false;
+            }
+        };
+
+        this.handleWheel = (e) => {
+            if (this.shiftPressed && this.chart) {
+                // Só interceptar se Shift estiver pressionado
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Capturar múltiplas propriedades do wheel event para debug
+                const deltaY = e.deltaY || e.detail || e.wheelDelta;
+                const wheelDelta = e.wheelDelta;
+                const detail = e.detail;
+                
+                console.log(`🔍 Debug wheel event: deltaY=${e.deltaY}, wheelDelta=${wheelDelta}, detail=${detail}, computed=${deltaY}`);
+                
+                // Determinar direção do zoom com múltiplas verificações
+                let zoomFactor;
+                if (e.deltaY !== 0) {
+                    zoomFactor = e.deltaY < 0 ? 1.2 : 0.8;
+                } else if (e.wheelDelta !== undefined) {
+                    zoomFactor = e.wheelDelta > 0 ? 1.2 : 0.8;
+                } else if (e.detail !== undefined) {
+                    zoomFactor = e.detail < 0 ? 1.2 : 0.8;
+                } else {
+                    console.warn('⚠️ Não foi possível determinar direção do scroll');
+                    return;
+                }
+                
+                console.log(`🔍 Zoom customizado: direção determinada, fator=${zoomFactor}`);
+                
+                // Aplicar zoom
+                this.chart.zoom(zoomFactor);
+            }
+            // Se Shift não estiver pressionado, deixar o evento passar normalmente (scroll da página)
+        };
+
+        // Event listeners para detectar Shift
+        document.addEventListener('keydown', this.handleKeyDown);
+        document.addEventListener('keyup', this.handleKeyUp);
+
+        // Event listener para wheel no canvas (passive: false para poder usar preventDefault quando necessário)
+        this.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
+
+        console.log('⚙️ Zoom customizado configurado para desktop');
     }
 
     // Zoom in
@@ -686,6 +781,184 @@ class ChartManager {
                 console.log('🔄 Zoom resetado');
             }
         }
+    }
+
+    // Definir modo admin
+    setAdminMode(isAdmin) {
+        this.isAdminMode = isAdmin;
+        console.log(`🔧 Modo admin do gráfico: ${isAdmin ? 'ativado' : 'desativado'}`);
+        
+        // Mostrar/ocultar instruções do modo admin
+        const adminInstructions = document.getElementById('adminChartInstructions');
+        if (adminInstructions) {
+            adminInstructions.style.display = isAdmin ? 'block' : 'none';
+        }
+        
+        // Configurar event listeners dos botões do card
+        if (isAdmin) {
+            this.setupMarkCardListeners();
+        } else {
+            this.hideMarkCard();
+        }
+    }
+
+    // Configurar event listeners do card de marcação
+    setupMarkCardListeners() {
+        const confirmBtn = document.getElementById('confirmCompesaMark');
+        const cancelBtn = document.getElementById('cancelCompesaMark');
+        
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => {
+                if (this.selectedPoint) {
+                    this.confirmCompesaMark();
+                }
+            });
+        }
+        
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.hideMarkCard();
+            });
+        }
+    }
+
+    // Lidar com cliques no gráfico (modo admin)
+    handleChartClick(event, elements) {
+        if (!this.isAdminMode) return;
+
+        // Obter posição do clique
+        const canvasPosition = Chart.helpers.getRelativePosition(event, this.chart);
+        const dataX = this.chart.scales.x.getValueForPixel(canvasPosition.x);
+        const dataY = this.chart.scales.y.getValueForPixel(canvasPosition.y);
+
+        console.log(`🖱️ Clique no gráfico - X: ${dataX}, Y: ${dataY}`);
+
+        // Encontrar ponto mais próximo
+        const closestPoint = this.findClosestDataPoint(dataX);
+        
+        if (closestPoint) {
+            const clickedDate = new Date(closestPoint.x);
+            const level = closestPoint.y;
+            
+            console.log(`📍 Ponto mais próximo: ${firebaseService.formatDateTime(clickedDate)} - ${level}%`);
+            
+            // Mostrar card para confirmar marcação
+            this.showMarkCard(closestPoint, clickedDate, level);
+        }
+    }
+
+    // Mostrar card para marcar chegada da COMPESA
+    showMarkCard(dataPoint, date, level) {
+        // Armazenar ponto selecionado
+        this.selectedPoint = {
+            dataPoint,
+            date,
+            level
+        };
+        
+        // Calcular aumento
+        const previousPoint = this.findPreviousDataPoint(dataPoint.x);
+        const previousLevel = previousPoint ? previousPoint.y : level;
+        const increase = Math.max(0, level - previousLevel);
+        
+        // Preencher dados do card
+        const markCard = document.getElementById('compesaMarkCard');
+        const dateTimeElement = document.getElementById('markDateTime');
+        const levelElement = document.getElementById('markLevel');
+        const increaseElement = document.getElementById('markIncrease');
+        
+        if (markCard && dateTimeElement && levelElement && increaseElement) {
+            dateTimeElement.textContent = firebaseService.formatDateTime(date);
+            levelElement.textContent = `${level.toFixed(1)}%`;
+            increaseElement.textContent = `+${increase.toFixed(1)}%`;
+            increaseElement.style.color = increase > 0 ? '#27ae60' : '#95a5a6';
+            
+            // Mostrar card com animação
+            markCard.style.display = 'block';
+        }
+    }
+
+    // Ocultar card de marcação
+    hideMarkCard() {
+        const markCard = document.getElementById('compesaMarkCard');
+        if (markCard) {
+            markCard.style.display = 'none';
+        }
+        this.selectedPoint = null;
+    }
+
+    // Confirmar marcação da COMPESA
+    async confirmCompesaMark() {
+        if (!this.selectedPoint) return;
+        
+        const { dataPoint, date, level } = this.selectedPoint;
+        
+        // Ocultar card
+        this.hideMarkCard();
+        
+        // Executar marcação
+        await this.markCompesaArrival(dataPoint, date, level);
+    }
+
+    // Marcar chegada da COMPESA manualmente
+    async markCompesaArrival(dataPoint, date, level) {
+        try {
+            console.log(`🚰 Marcando chegada da COMPESA manualmente: ${firebaseService.formatDateTime(date)}`);
+            
+            // Encontrar nível anterior para calcular aumento
+            const previousPoint = this.findPreviousDataPoint(dataPoint.x);
+            const previousLevel = previousPoint ? previousPoint.y : level;
+            const increase = Math.max(0, level - previousLevel);
+            
+            // Criar dados da chegada
+            const arrivalData = {
+                timestamp: dataPoint.x,
+                date: firebaseService.formatDateTime(date),
+                previous_level: Math.round(previousLevel * 10) / 10,
+                new_level: Math.round(level * 10) / 10,
+                increase: Math.round(increase * 10) / 10,
+                datetime: firebaseService.formatDateTime(date),
+                manual_mark: true,
+                marked_by: 'admin',
+                marked_at: Date.now()
+            };
+            
+            // Salvar no Firebase
+            const result = await firebaseService.saveManualCompesaArrival(arrivalData);
+            
+            if (result.success) {
+                console.log('✅ Chegada da COMPESA marcada com sucesso');
+                
+                // Notificar o app principal para atualizar a interface
+                if (window.app && typeof window.app.updateAfterManualCompesaMark === 'function') {
+                    await window.app.updateAfterManualCompesaMark();
+                }
+                
+                alert(`✅ Chegada da COMPESA marcada com sucesso!\n\nAumento: +${increase.toFixed(1)}%`);
+            } else {
+                throw new Error(result.error || 'Erro desconhecido');
+            }
+            
+        } catch (error) {
+            console.error('❌ Erro ao marcar chegada da COMPESA:', error);
+            alert(`❌ Erro ao marcar chegada da COMPESA: ${error.message}`);
+        }
+    }
+
+    // Encontrar ponto anterior para calcular aumento
+    findPreviousDataPoint(timestamp) {
+        if (!this.data.length) return null;
+        
+        let previousPoint = null;
+        
+        for (let i = 0; i < this.data.length; i++) {
+            if (this.data[i].x >= timestamp) {
+                break;
+            }
+            previousPoint = this.data[i];
+        }
+        
+        return previousPoint;
     }
 }
 

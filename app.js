@@ -6,6 +6,11 @@ class WaterMonitorApp {
         this.currentPeriod = '24h';
         this.iconClickCount = 0;
         this.iconClickTimeout = null;
+        this.isAdminMode = false;
+        this.autoUpdateEnabled = true;
+        this.pumpDialogCallback = null;
+        this.pumpDurationTimer = null;
+        this.pumpStartTime = null;
         
         this.init();
     }
@@ -78,6 +83,14 @@ class WaterMonitorApp {
             });
         }
 
+        // Checkbox de atualização automática
+        const autoUpdateCheckbox = document.getElementById('autoUpdateEnabled');
+        if (autoUpdateCheckbox) {
+            autoUpdateCheckbox.addEventListener('change', (e) => {
+                this.toggleAutoUpdate(e.target.checked);
+            });
+        }
+
         // Botão da bomba
         const pumpButton = document.getElementById('pumpButton');
         if (pumpButton) {
@@ -109,6 +122,35 @@ class WaterMonitorApp {
                 this.startAutoUpdate();
             }
         });
+
+        // Event listeners do dialog da bomba
+        const pumpDialogCancel = document.getElementById('pumpDialogCancel');
+        const pumpDialogConfirm = document.getElementById('pumpDialogConfirm');
+        const pumpDialogOverlay = document.getElementById('pumpDialogOverlay');
+
+        if (pumpDialogCancel) {
+            pumpDialogCancel.addEventListener('click', () => {
+                this.hidePumpDialog();
+            });
+        }
+
+        if (pumpDialogConfirm) {
+            pumpDialogConfirm.addEventListener('click', () => {
+                if (this.pumpDialogCallback) {
+                    this.pumpDialogCallback();
+                }
+                this.hidePumpDialog();
+            });
+        }
+
+        // Fechar dialog ao clicar no overlay
+        if (pumpDialogOverlay) {
+            pumpDialogOverlay.addEventListener('click', (e) => {
+                if (e.target === pumpDialogOverlay) {
+                    this.hidePumpDialog();
+                }
+            });
+        }
     }
 
     // Carregar dados iniciais
@@ -281,7 +323,10 @@ class WaterMonitorApp {
                             Aumento de ${arrival.increase}% (${arrival.previousLevel}% → ${arrival.newLevel}%)
                         </div>
                     </div>
-                    <div class="event-level">${arrival.newLevel}%</div>
+                    <div class="event-actions">
+                        <div class="event-level">${arrival.newLevel}%</div>
+                        ${this.isAdminMode ? `<button class="delete-event-btn" onclick="app.deleteCompesaEvent(${arrival.timestamp}, '${arrival.dateStr}')" title="Excluir evento">🗑️</button>` : ''}
+                    </div>
                 </div>
             `).join('');
 
@@ -358,6 +403,32 @@ class WaterMonitorApp {
             const latestData = await firebaseService.getLatestData();
             const isCurrentlyOn = latestData?.pump_is_on || false;
             
+            // Configurar dialog baseado no estado atual
+            const title = isCurrentlyOn ? 'Desligar Bomba' : 'Ligar Bomba';
+            const message = isCurrentlyOn 
+                ? 'Tem certeza que deseja desligar a bomba de água?' 
+                : 'Tem certeza que deseja ligar a bomba de água?';
+            const icon = 'water-pump.png'; // Usar imagem da bomba
+            const isDanger = isCurrentlyOn;
+            
+            // Mostrar dialog de confirmação
+            this.showPumpDialog(title, message, icon, isDanger, () => {
+                this.executePumpAction(isCurrentlyOn);
+            });
+            
+        } catch (error) {
+            console.error('❌ Erro ao verificar estado da bomba:', error);
+            alert(`❌ Erro ao verificar estado da bomba: ${error.message}`);
+        }
+    }
+
+    // Executar ação da bomba após confirmação
+    async executePumpAction(isCurrentlyOn) {
+        const pumpButton = document.getElementById('pumpButton');
+        if (!pumpButton) return;
+
+        try {
+            
             // Feedback visual - botão em estado de loading
             pumpButton.disabled = true;
             pumpButton.classList.add('loading');
@@ -424,7 +495,13 @@ class WaterMonitorApp {
         
         if (adminParam === '1') {
             console.log('🔑 Acesso administrativo detectado via query param');
+            this.isAdminMode = true;
             this.showPumpCard(true);
+            
+            // Ativar modo admin no gráfico
+            if (this.chartManager) {
+                this.chartManager.setAdminMode(true);
+            }
         }
     }
 
@@ -440,8 +517,14 @@ class WaterMonitorApp {
 
         // Se chegou a 7 cliques, mostrar o card da bomba
         if (this.iconClickCount >= 7) {
+            this.isAdminMode = true;
             this.showPumpCard();
             this.iconClickCount = 0; // Reset contador
+            
+            // Ativar modo admin no gráfico
+            if (this.chartManager) {
+                this.chartManager.setAdminMode(true);
+            }
         } else {
             // Reset contador após 3 segundos de inatividade
             this.iconClickTimeout = setTimeout(() => {
@@ -494,9 +577,10 @@ class WaterMonitorApp {
             
             const statusElement = document.getElementById('pumpStatus');
             const lastActivationElement = document.getElementById('pumpLastActivation');
+            const durationElement = document.getElementById('pumpDuration');
             const pumpButton = document.getElementById('pumpButton');
             
-            if (latestData && statusElement && lastActivationElement && pumpButton) {
+            if (latestData && statusElement && lastActivationElement && durationElement && pumpButton) {
                 const isOn = latestData.pump_is_on || false;
                 const lastActivation = latestData.pump_last_activation;
                 
@@ -511,6 +595,9 @@ class WaterMonitorApp {
                 } else {
                     lastActivationElement.textContent = 'Nunca';
                 }
+                
+                // Atualizar duração
+                await this.updatePumpDurationDisplay(isOn, lastActivation);
                 
                 // Atualizar botão
                 if (isOn) {
@@ -527,11 +614,81 @@ class WaterMonitorApp {
         }
     }
 
+    // Atualizar exibição da duração da bomba
+    async updatePumpDurationDisplay(isOn, lastActivation) {
+        const durationElement = document.getElementById('pumpDuration');
+        if (!durationElement) return;
+
+        if (isOn && lastActivation) {
+            // Bomba ligada - mostrar duração em tempo real
+            this.startPumpDurationTimer(lastActivation);
+        } else {
+            // Bomba desligada - mostrar duração da última sessão
+            this.stopPumpDurationTimer();
+            
+            try {
+                // Buscar última ativação com duração
+                const lastActivationWithDuration = await firebaseService.getLastPumpActivationWithDuration();
+                
+                if (lastActivationWithDuration && lastActivationWithDuration.duration_string) {
+                    durationElement.textContent = lastActivationWithDuration.duration_string;
+                    durationElement.style.color = '#7f8c8d'; // Cinza para indicar histórico
+                } else {
+                    durationElement.textContent = '00:00:00';
+                    durationElement.style.color = '#7f8c8d';
+                }
+            } catch (error) {
+                console.error('❌ Erro ao buscar duração da última sessão:', error);
+                durationElement.textContent = '--';
+                durationElement.style.color = '#7f8c8d';
+            }
+        }
+    }
+
+    // Alternar atualização automática
+    toggleAutoUpdate(enabled) {
+        this.autoUpdateEnabled = enabled;
+        
+        if (enabled) {
+            console.log('✅ Atualização automática ativada');
+            this.startAutoUpdate();
+        } else {
+            console.log('⏸️ Atualização automática pausada');
+            this.stopAutoUpdate();
+        }
+        
+        // Atualizar texto do footer
+        this.updateFooterStatus();
+    }
+
+    // Atualizar status no footer
+    updateFooterStatus() {
+        const footer = document.querySelector('footer p');
+        if (footer) {
+            if (this.autoUpdateEnabled) {
+                footer.textContent = '🔄 Atualização automática a cada 30 segundos';
+            } else {
+                footer.textContent = '⏸️ Atualização automática pausada';
+            }
+        }
+    }
+
     // Iniciar atualizações automáticas
     startAutoUpdate() {
+        if (!this.autoUpdateEnabled) {
+            console.log('⏸️ Atualização automática está desabilitada');
+            return;
+        }
+
         this.stopAutoUpdate(); // Limpar interval anterior
         
         this.updateInterval = setInterval(async () => {
+            if (!this.autoUpdateEnabled) {
+                console.log('⏸️ Parando atualização automática (desabilitada pelo usuário)');
+                this.stopAutoUpdate();
+                return;
+            }
+
             try {
                 await this.updateCurrentLevel();
                 
@@ -589,9 +746,150 @@ class WaterMonitorApp {
         }, 5000);
     }
 
+    // Excluir evento da COMPESA
+    async deleteCompesaEvent(timestamp, dateStr) {
+        if (!this.isAdminMode) {
+            console.warn('🔒 Tentativa de exclusão sem permissão admin');
+            return;
+        }
+
+        // Confirmar exclusão
+        const confirmed = confirm('Tem certeza que deseja excluir este evento da COMPESA?\n\nEsta ação não pode ser desfeita.');
+        if (!confirmed) return;
+
+        try {
+            console.log(`🗑️ Excluindo evento da COMPESA: ${timestamp}`);
+            
+            // Chamar serviço de exclusão
+            const result = await firebaseService.deleteCompesaEvent(timestamp, dateStr);
+            
+            if (result.success) {
+                console.log('✅ Evento excluído com sucesso');
+                
+                // Atualizar interface
+                await this.updateEventsList();
+                await this.updateStatistics();
+                
+                // Atualizar gráfico para remover linha vertical
+                await this.chartManager.updateChart(this.currentPeriod);
+                
+                // Feedback visual
+                alert('✅ Evento da COMPESA excluído com sucesso!');
+            } else {
+                throw new Error(result.error || 'Erro desconhecido');
+            }
+            
+        } catch (error) {
+            console.error('❌ Erro ao excluir evento:', error);
+            alert(`❌ Erro ao excluir evento: ${error.message}`);
+        }
+    }
+
+    // Iniciar timer de duração da bomba
+    startPumpDurationTimer(startTime) {
+        this.stopPumpDurationTimer(); // Limpar timer anterior
+        this.pumpStartTime = startTime;
+        
+        this.pumpDurationTimer = setInterval(() => {
+            this.updatePumpDuration();
+        }, 1000); // Atualizar a cada segundo
+        
+        console.log('⏱️ Timer de duração da bomba iniciado');
+    }
+
+    // Parar timer de duração da bomba
+    stopPumpDurationTimer() {
+        if (this.pumpDurationTimer) {
+            clearInterval(this.pumpDurationTimer);
+            this.pumpDurationTimer = null;
+        }
+        this.pumpStartTime = null;
+    }
+
+    // Atualizar duração da bomba em tempo real
+    updatePumpDuration() {
+        const durationElement = document.getElementById('pumpDuration');
+        if (!durationElement || !this.pumpStartTime) return;
+
+        const now = Date.now();
+        const duration = now - this.pumpStartTime;
+        const formattedDuration = firebaseService.formatDuration(duration);
+        
+        durationElement.textContent = formattedDuration;
+        durationElement.style.color = '#27ae60'; // Verde para indicar ativo
+    }
+
+    // Mostrar dialog de confirmação da bomba
+    showPumpDialog(title, message, icon, isDanger, callback) {
+        const overlay = document.getElementById('pumpDialogOverlay');
+        const titleElement = document.getElementById('pumpDialogTitle');
+        const messageElement = document.getElementById('pumpDialogMessage');
+        const iconElement = document.getElementById('pumpDialogIcon');
+        const confirmBtn = document.getElementById('pumpDialogConfirm');
+
+        if (overlay && titleElement && messageElement && iconElement && confirmBtn) {
+            titleElement.textContent = title;
+            messageElement.textContent = message;
+            
+            // Configurar ícone - verificar se é imagem ou emoji
+            if (icon.endsWith('.png') || icon.endsWith('.jpg') || icon.endsWith('.svg')) {
+                // É uma imagem
+                iconElement.innerHTML = `<img src="${icon}" alt="Bomba" style="width: 48px; height: 48px; object-fit: contain;">`;
+            } else {
+                // É um emoji
+                iconElement.textContent = icon;
+                iconElement.innerHTML = iconElement.textContent; // Limpar qualquer HTML anterior
+            }
+            
+            // Configurar botão de confirmação
+            if (isDanger) {
+                confirmBtn.classList.add('danger');
+            } else {
+                confirmBtn.classList.remove('danger');
+            }
+            
+            // Armazenar callback
+            this.pumpDialogCallback = callback;
+            
+            // Mostrar dialog
+            overlay.style.display = 'flex';
+        }
+    }
+
+    // Ocultar dialog de confirmação da bomba
+    hidePumpDialog() {
+        const overlay = document.getElementById('pumpDialogOverlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+        this.pumpDialogCallback = null;
+    }
+
+    // Atualizar interface após marcação manual da COMPESA
+    async updateAfterManualCompesaMark() {
+        try {
+            console.log('🔄 Atualizando interface após marcação manual da COMPESA');
+            
+            // Atualizar histórico de eventos
+            await this.updateEventsList();
+            
+            // Atualizar estatísticas
+            await this.updateStatistics();
+            
+            // Atualizar gráfico para mostrar nova linha vertical
+            await this.chartManager.updateChart(this.currentPeriod);
+            
+            console.log('✅ Interface atualizada após marcação manual');
+            
+        } catch (error) {
+            console.error('❌ Erro ao atualizar interface após marcação manual:', error);
+        }
+    }
+
     // Destruir aplicação
     destroy() {
         this.stopAutoUpdate();
+        this.stopPumpDurationTimer();
         firebaseService.stopListening();
         
         if (this.chartManager) {
