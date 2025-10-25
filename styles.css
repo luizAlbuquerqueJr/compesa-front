@@ -146,6 +146,157 @@ header h1 {
     accent-color: #3498db;
 }
 
+/* Card de Controle da Bomba */
+.pump-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 25px;
+    margin: 0 auto 30px auto;
+    max-width: 1200px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(39, 174, 96, 0.3);
+    animation: slideDown 0.5s ease-out;
+}
+
+.pump-card-content {
+    text-align: center;
+}
+
+.pump-card h3 {
+    color: #2c3e50;
+    margin: 0 0 20px 0;
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.pump-icon {
+    width: 24px;
+    height: 24px;
+    vertical-align: middle;
+}
+
+.pump-icon-btn {
+    width: 20px;
+    height: 20px;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+.pump-status {
+    background: rgba(52, 152, 219, 0.08);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 24px;
+    text-align: left;
+    border: 1px solid rgba(52, 152, 219, 0.15);
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.status-item:last-child {
+    margin-bottom: 0;
+}
+
+.status-label {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.status-value {
+    color: #7f8c8d;
+    font-weight: 500;
+}
+
+.status-value.pump-on {
+    color: #27ae60;
+    font-weight: 600;
+}
+
+.status-value.pump-off {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+.pump-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pump-btn {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 28px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 12px rgba(52, 152, 219, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 200px;
+    margin: 0 auto;
+}
+
+.pump-btn:hover {
+    background: linear-gradient(135deg, #2980b9, #1f5f8b);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 18px rgba(52, 152, 219, 0.4);
+}
+
+.pump-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+}
+
+.pump-btn:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.pump-btn.loading {
+    background: #f39c12;
+    cursor: wait;
+}
+
+.pump-btn.success {
+    background: #27ae60;
+    animation: pulse 0.6s ease-in-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
 /* Gráfico */
 .chart-section {
     background: rgba(255, 255, 255, 0.95);
@@ -414,6 +565,17 @@ footer p {
     .chart-instructions p {
         font-size: 0.85rem;
         text-align: center;
+    }
+    
+    .pump-card {
+        margin: 0 15px 30px 15px;
+        padding: 20px;
+    }
+    
+    .pump-btn {
+        padding: 14px 28px;
+        font-size: 18px;
+        min-height: 50px;
     }
     
     .stats {

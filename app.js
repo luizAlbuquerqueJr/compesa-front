@@ -4,6 +4,8 @@ class WaterMonitorApp {
         this.chartManager = null;
         this.updateInterval = null;
         this.currentPeriod = '24h';
+        this.iconClickCount = 0;
+        this.iconClickTimeout = null;
         
         this.init();
     }
@@ -68,6 +70,30 @@ class WaterMonitorApp {
             });
         }
 
+        // Checkbox de eventos da bomba
+        const pumpCheckbox = document.getElementById('showPumpEvents');
+        if (pumpCheckbox) {
+            pumpCheckbox.addEventListener('change', (e) => {
+                this.chartManager.togglePumpEvents(e.target.checked);
+            });
+        }
+
+        // Botão da bomba
+        const pumpButton = document.getElementById('pumpButton');
+        if (pumpButton) {
+            pumpButton.addEventListener('click', () => {
+                this.activatePump();
+            });
+        }
+
+        // Ícone da caixa d'água (contador de cliques para mostrar controle da bomba)
+        const waterTankIcon = document.querySelector('.water-tank-icon');
+        if (waterTankIcon) {
+            waterTankIcon.addEventListener('click', () => {
+                this.handleIconClick();
+            });
+        }
+
         // Redimensionamento da janela
         window.addEventListener('resize', () => {
             if (this.chartManager) {
@@ -92,6 +118,9 @@ class WaterMonitorApp {
         
         // Atualizar label inicial do nível médio
         this.updateAverageLevelLabel(this.currentPeriod);
+        
+        // Verificar se deve mostrar card da bomba via query param
+        this.checkAdminAccess();
         
         // Carregar gráfico
         await this.chartManager.updateChart(this.currentPeriod);
@@ -316,6 +345,185 @@ class WaterMonitorApp {
             return 'level-medium';
         } else {
             return 'level-high';
+        }
+    }
+
+    // Ativar/Desativar bomba manualmente
+    async activatePump() {
+        const pumpButton = document.getElementById('pumpButton');
+        if (!pumpButton) return;
+
+        try {
+            // Verificar estado atual da bomba
+            const latestData = await firebaseService.getLatestData();
+            const isCurrentlyOn = latestData?.pump_is_on || false;
+            
+            // Feedback visual - botão em estado de loading
+            pumpButton.disabled = true;
+            pumpButton.classList.add('loading');
+            pumpButton.innerHTML = isCurrentlyOn ? '⏳ Desligando...' : '⏳ Ligando...';
+
+            console.log(`🔄 ${isCurrentlyOn ? 'Desligando' : 'Ligando'} bomba manualmente...`);
+
+            // Gravar no Firebase
+            const result = isCurrentlyOn 
+                ? await firebaseService.savePumpDeactivation()
+                : await firebaseService.savePumpActivation();
+
+            if (result.success) {
+                // Feedback de sucesso
+                pumpButton.classList.remove('loading');
+                pumpButton.classList.add('success');
+                
+                if (isCurrentlyOn) {
+                    pumpButton.innerHTML = `✅ Bomba Desligada! (${result.duration || 'N/A'})`;
+                    console.log('✅ Bomba desligada com sucesso:', result.timestamp);
+                } else {
+                    pumpButton.innerHTML = '✅ Bomba Ligada!';
+                    console.log('✅ Bomba ligada com sucesso:', result.timestamp);
+                }
+
+                // Atualizar gráfico para mostrar o acionamento
+                await this.chartManager.updateChart(this.currentPeriod);
+
+                // Atualizar status do card
+                setTimeout(async () => {
+                    await this.updatePumpStatus();
+                    pumpButton.disabled = false;
+                    pumpButton.classList.remove('success');
+                }, 3000);
+
+            } else {
+                throw new Error(result.error || 'Erro desconhecido');
+            }
+
+        } catch (error) {
+            console.error('❌ Erro ao controlar bomba:', error);
+
+            // Feedback de erro
+            pumpButton.classList.remove('loading');
+            pumpButton.style.background = '#e74c3c';
+            pumpButton.innerHTML = '❌ Erro ao Controlar';
+
+            // Resetar botão após 3 segundos
+            setTimeout(async () => {
+                pumpButton.disabled = false;
+                pumpButton.style.background = '';
+                await this.updatePumpStatus();
+            }, 3000);
+
+            // Mostrar erro para o usuário
+            alert(`Erro ao controlar bomba: ${error.message}`);
+        }
+    }
+
+    // Verificar acesso administrativo via query param
+    checkAdminAccess() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const adminParam = urlParams.get('admin');
+        
+        if (adminParam === '1') {
+            console.log('🔑 Acesso administrativo detectado via query param');
+            this.showPumpCard(true);
+        }
+    }
+
+    // Gerenciar cliques no ícone da caixa d'água
+    handleIconClick() {
+        this.iconClickCount++;
+        console.log(`🖱️ Clique ${this.iconClickCount}/7 no ícone da caixa d'água`);
+
+        // Limpar timeout anterior
+        if (this.iconClickTimeout) {
+            clearTimeout(this.iconClickTimeout);
+        }
+
+        // Se chegou a 7 cliques, mostrar o card da bomba
+        if (this.iconClickCount >= 7) {
+            this.showPumpCard();
+            this.iconClickCount = 0; // Reset contador
+        } else {
+            // Reset contador após 3 segundos de inatividade
+            this.iconClickTimeout = setTimeout(() => {
+                console.log('⏰ Timeout - resetando contador de cliques');
+                this.iconClickCount = 0;
+            }, 3000);
+        }
+    }
+
+    // Mostrar card de controle da bomba
+    showPumpCard(isAdminAccess = false) {
+        const pumpCard = document.getElementById('pumpCard');
+        if (pumpCard) {
+            pumpCard.style.display = 'block';
+            console.log('💧 Card de controle da bomba ativado!');
+            
+            // Atualizar status da bomba
+            this.updatePumpStatus();
+            
+            // Scroll suave para o card da bomba
+            pumpCard.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
+            });
+
+            // Auto-ocultar após 30 segundos por segurança (exceto para acesso admin)
+            if (!isAdminAccess) {
+                setTimeout(() => {
+                    this.hidePumpCard();
+                }, 30000);
+            } else {
+                console.log('🔑 Acesso administrativo - card permanecerá visível');
+            }
+        }
+    }
+
+    // Ocultar card de controle da bomba
+    hidePumpCard() {
+        const pumpCard = document.getElementById('pumpCard');
+        if (pumpCard) {
+            pumpCard.style.display = 'none';
+            console.log('🔒 Card de controle da bomba ocultado');
+        }
+    }
+
+    // Atualizar status da bomba no card
+    async updatePumpStatus() {
+        try {
+            const latestData = await firebaseService.getLatestData();
+            
+            const statusElement = document.getElementById('pumpStatus');
+            const lastActivationElement = document.getElementById('pumpLastActivation');
+            const pumpButton = document.getElementById('pumpButton');
+            
+            if (latestData && statusElement && lastActivationElement && pumpButton) {
+                const isOn = latestData.pump_is_on || false;
+                const lastActivation = latestData.pump_last_activation;
+                
+                // Atualizar status
+                statusElement.textContent = isOn ? '🟢 Ligada' : '🔴 Desligada';
+                statusElement.className = `status-value ${isOn ? 'pump-on' : 'pump-off'}`;
+                
+                // Atualizar última ativação
+                if (lastActivation) {
+                    const date = new Date(lastActivation);
+                    lastActivationElement.textContent = firebaseService.formatDateTime(date);
+                } else {
+                    lastActivationElement.textContent = 'Nunca';
+                }
+                
+                // Atualizar botão
+                if (isOn) {
+                    pumpButton.innerHTML = '🛑 Desligar Bomba';
+                    pumpButton.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                } else {
+                    pumpButton.innerHTML = '<img src="water-pump.png" alt="Bomba" class="pump-icon-btn"> Ligar Bomba';
+                    pumpButton.style.background = 'linear-gradient(135deg, #3498db, #2980b9)';
+                }
+            }
+            
+        } catch (error) {
+            console.error('❌ Erro ao atualizar status da bomba:', error);
         }
     }
 

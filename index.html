@@ -25,6 +25,30 @@
             </div>
         </header>
 
+        <!-- Card de Controle da Bomba (oculto por padrão) -->
+        <section class="pump-card" id="pumpCard" style="display: none;">
+            <div class="pump-card-content">
+                <h3><img src="water-pump.png" alt="Bomba" class="pump-icon"> Controle da Bomba</h3>
+                
+                <div class="pump-status">
+                    <div class="status-item">
+                        <span class="status-label">Status:</span>
+                        <span class="status-value" id="pumpStatus">Carregando...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Última ativação:</span>
+                        <span class="status-value" id="pumpLastActivation">--</span>
+                    </div>
+                </div>
+                
+                <div class="pump-controls">
+                    <button id="pumpButton" class="pump-btn">
+                        <img src="water-pump.png" alt="Bomba" class="pump-icon-btn"> Ligar Bomba
+                    </button>
+                </div>
+            </div>
+        </section>
+
         <main>
             <!-- Controles do Gráfico -->
             <section class="controls">
@@ -39,6 +63,10 @@
                     <label>
                         <input type="checkbox" id="showCompesaEvents" checked>
                         Mostrar dados da COMPESA
+                    </label>
+                    <label>
+                        <input type="checkbox" id="showPumpEvents" checked>
+                        Mostrar acionamentos da bomba
                     </label>
                     <label>
                         <input type="checkbox" id="showTrendLine">

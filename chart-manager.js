@@ -15,9 +15,20 @@ class ChartManager {
         this.currentPeriod = '24h';
         this.showCompesaEvents = true;
         this.showTrendLine = false;
+        this.showPumpEvents = true;
         this.data = [];
         this.events = [];
         this.compesaArrivals = [];
+        this.pumpActivations = [];
+        
+        // Carregar ícone da bomba
+        this.pumpIcon = new Image();
+        this.pumpIcon.src = 'water-pump.png';
+        this.pumpIconLoaded = false;
+        this.pumpIcon.onload = () => {
+            this.pumpIconLoaded = true;
+            console.log('✅ Ícone da bomba carregado');
+        };
         
         // Verificar se Chart.js está disponível
         if (typeof Chart === 'undefined') {
@@ -45,55 +56,147 @@ class ChartManager {
     initChart() {
         const config = appConfig.chart;
         
-        // Plugin para desenhar linhas verticais da COMPESA
+        // Plugin para desenhar linhas verticais da COMPESA e Bomba
         const verticalLinesPlugin = {
             id: 'verticalLines',
             afterDraw: (chart) => {
-                if (!this.showCompesaEvents || !this.compesaArrivals.length) {
-                    console.log('🚫 Linhas verticais não desenhadas:', {
-                        showCompesaEvents: this.showCompesaEvents,
-                        arrivalsCount: this.compesaArrivals.length
-                    });
-                    return;
-                }
-                
-                console.log('✅ Desenhando linhas verticais para', this.compesaArrivals.length, 'chegadas');
-                
                 const ctx = chart.ctx;
                 const chartArea = chart.chartArea;
                 const xScale = chart.scales.x;
                 
                 ctx.save();
                 
-                this.compesaArrivals.forEach((arrival, index) => {
-                    const x = xScale.getPixelForValue(arrival.timestamp);
+                // Linhas da COMPESA
+                if (this.showCompesaEvents && this.compesaArrivals.length) {
+                    console.log('✅ Desenhando linhas verticais para', this.compesaArrivals.length, 'chegadas da COMPESA');
                     
-                    if (x >= chartArea.left && x <= chartArea.right) {
-                        // Linha vertical
-                        ctx.strokeStyle = 'blue';
-                        ctx.lineWidth = 1;
-                        ctx.setLineDash([8, 4]);
-                        ctx.beginPath();
-                        ctx.moveTo(x, chartArea.top);
-                        ctx.lineTo(x, chartArea.bottom);
-                        ctx.stroke();
+                    this.compesaArrivals.forEach((arrival, index) => {
+                        const x = xScale.getPixelForValue(arrival.timestamp);
                         
-                        // Texto indicativo
-                        ctx.fillStyle = 'blue';
-                        ctx.font = 'bold 11px Arial';
-                        ctx.textAlign = 'center';
+                        if (x >= chartArea.left && x <= chartArea.right) {
+                            // Linha vertical da COMPESA
+                            ctx.strokeStyle = 'blue';
+                            ctx.lineWidth = 1;
+                            ctx.setLineDash([8, 4]);
+                            ctx.beginPath();
+                            ctx.moveTo(x, chartArea.top);
+                            ctx.lineTo(x, chartArea.bottom);
+                            ctx.stroke();
+                            
+                            // Verificar se deve mostrar o texto (distância > 100px da próxima chegada)
+                            let showText = true;
+                            if (index < this.compesaArrivals.length - 1) {
+                                const nextX = xScale.getPixelForValue(this.compesaArrivals[index + 1].timestamp);
+                                const distance = Math.abs(nextX - x);
+                                if (distance <= 100) {
+                                    showText = false;
+                                }
+                            }
+                            
+                            // Texto indicativo (apenas se houver espaço suficiente)
+                            if (showText) {
+                                ctx.fillStyle = 'blue';
+                                ctx.font = 'bold 11px Arial';
+                                ctx.textAlign = 'center';
+                                
+                                const textY = chartArea.top - 8;
+                                ctx.fillText('💧 COMPESA', x, textY);
+                            }
+                        }
+                    });
+                }
+                
+                // Linhas dos acionamentos da bomba
+                if (this.showPumpEvents && this.pumpActivations.length) {
+                    const activations = this.pumpActivations.filter(pump => pump.action === 'activated');
+                    const deactivations = this.pumpActivations.filter(pump => pump.action === 'deactivated');
+                    console.log('✅ Desenhando linhas verticais para', activations.length, 'acionamentos e', deactivations.length, 'desligamentos da bomba');
+                    
+                    // Linhas verdes para acionamentos (ligar bomba)
+                    activations.forEach((activation, index) => {
+                        const x = xScale.getPixelForValue(activation.timestamp);
                         
-                        // Alternar posição do texto para evitar sobreposição (dentro da área do gráfico)
-                        const textY = chartArea.top - 8;
-                        ctx.fillText('💧 COMPESA', x, textY);
+                        if (x >= chartArea.left && x <= chartArea.right) {
+                            // Linha vertical verde da bomba
+                            ctx.strokeStyle = '#27ae60';
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([5, 3]);
+                            ctx.beginPath();
+                            ctx.moveTo(x, chartArea.top);
+                            ctx.lineTo(x, chartArea.bottom);
+                            ctx.stroke();
+                            
+                            // Verificar se deve mostrar o texto (distância > 100px da próxima ativação)
+                            let showText = true;
+                            if (index < activations.length - 1) {
+                                const nextX = xScale.getPixelForValue(activations[index + 1].timestamp);
+                                const distance = Math.abs(nextX - x);
+                                if (distance <= 100) {
+                                    showText = false;
+                                }
+                            }
+                            
+                            // Ícone da bomba e texto lado a lado (apenas se houver espaço suficiente)
+                            if (showText && this.pumpIconLoaded) {
+                                const iconSize = 14;
+                                const textY = chartArea.top - 22;
+                                
+                                // Calcular posições para centralizar ícone + texto
+                                ctx.font = 'bold 9px Arial';
+                                const textWidth = ctx.measureText('BOMBA').width;
+                                const totalWidth = iconSize + 3 + textWidth; // ícone + gap + texto
+                                
+                                const startX = x - totalWidth / 2;
+                                const iconX = startX;
+                                const textX = startX + iconSize + 3;
+                                
+                                // Desenhar ícone
+                                ctx.drawImage(this.pumpIcon, iconX, textY - iconSize + 2, iconSize, iconSize);
+                                
+                                // Desenhar texto
+                                ctx.fillStyle = '#27ae60';
+                                ctx.textAlign = 'left';
+                                ctx.fillText('BOMBA', textX, textY-2);
+                            }
+                        }
+                    });
+                    
+                    // Sombreamento entre acionamentos e desligamentos
+                    activations.forEach((activation) => {
+                        // Encontrar o desligamento correspondente
+                        const correspondingDeactivation = deactivations.find(deact => 
+                            deact.timestamp > activation.timestamp && 
+                            deact.timestamp === activation.deactivated_at
+                        );
                         
-                        // // Adicionar informação do aumento
-                        // if (arrival.increase) {
-                        //     ctx.font = '9px Arial';
-                        //     ctx.fillText(`+${arrival.increase.toFixed(1)}%`, x, textY + 12);
-                        // }
-                    }
-                });
+                        if (correspondingDeactivation) {
+                            const startX = xScale.getPixelForValue(activation.timestamp);
+                            const endX = xScale.getPixelForValue(correspondingDeactivation.timestamp);
+                            
+                            if (startX >= chartArea.left && endX <= chartArea.right && endX > startX) {
+                                // Desenhar área sombreada
+                                ctx.fillStyle = 'rgba(39, 174, 96, 0.1)'; // Verde transparente
+                                ctx.fillRect(startX, chartArea.top, endX - startX, chartArea.bottom - chartArea.top);
+                            }
+                        }
+                    });
+                    
+                    // Linhas vermelhas para desligamentos (sem texto)
+                    deactivations.forEach((deactivation) => {
+                        const x = xScale.getPixelForValue(deactivation.timestamp);
+                        
+                        if (x >= chartArea.left && x <= chartArea.right) {
+                            // Linha vertical vermelha da bomba (desligamento)
+                            ctx.strokeStyle = '#e74c3c';
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([3, 2]);
+                            ctx.beginPath();
+                            ctx.moveTo(x, chartArea.top);
+                            ctx.lineTo(x, chartArea.bottom);
+                            ctx.stroke();
+                        }
+                    });
+                }
                 
                 ctx.restore();
             }
@@ -191,6 +294,9 @@ class ChartManager {
                             },
                             afterBody: (context) => {
                                 const timestamp = context[0].parsed.x;
+                                const datasetLabel = context[0].dataset.label;
+                                
+                                // Verificar se é um evento da COMPESA
                                 const event = this.events.find(e => 
                                     Math.abs(e.timestamp - timestamp) < 300000
                                 );
@@ -198,6 +304,7 @@ class ChartManager {
                                 if (event) {
                                     return ['', '🚰 Chegada da COMPESA', `Aumento: +${event.increase.toFixed(1)}%`];
                                 }
+                                
                                 return [];
                             }
                         }
@@ -275,6 +382,10 @@ class ChartManager {
             this.compesaArrivals = this.filterArrivalsByPeriod(allArrivals, period);
             console.log(`📊 Chegadas da COMPESA encontradas para ${period}:`, this.compesaArrivals.length);
 
+            // Buscar acionamentos da bomba
+            this.pumpActivations = await firebaseService.getPumpActivations(period);
+            console.log(`💧 Acionamentos da bomba encontrados para ${period}:`, this.pumpActivations.length);
+
             // Atualizar datasets
             this.updateDatasets();
             
@@ -345,6 +456,8 @@ class ChartManager {
             });
         }
 
+        // Acionamentos da bomba são mostrados como linhas verticais via plugin
+
         // Linha de tendência
         if (this.showTrendLine && this.data.length > 1) {
             const trendData = this.calculateTrendLine();
@@ -403,6 +516,32 @@ class ChartManager {
         } else {
             return '#27ae60'; // Verde - alto
         }
+    }
+
+    // Encontrar ponto de dados mais próximo de um timestamp
+    findClosestDataPoint(timestamp) {
+        if (!this.data.length) return null;
+        
+        let closest = this.data[0];
+        let minDiff = Math.abs(this.data[0].x - timestamp);
+        
+        for (let i = 1; i < this.data.length; i++) {
+            const diff = Math.abs(this.data[i].x - timestamp);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = this.data[i];
+            }
+        }
+        
+        return closest;
+    }
+
+    // Toggle eventos da bomba
+    togglePumpEvents(show) {
+        this.showPumpEvents = show;
+        this.updateDatasets();
+        this.chart.update('active');
+        console.log(`💧 Eventos da bomba: ${show ? 'mostrar' : 'ocultar'}`);
     }
 
     // Mostrar/ocultar loading
