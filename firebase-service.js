@@ -17,6 +17,25 @@ class FirebaseService {
         }
     }
 
+    // Obter dados mais recentes do sensor de fluxo
+    async getLatestFlowData() {
+        try {
+            const snapshot = await this.database.ref('latest').once('value');
+            const data = snapshot.val();
+            
+            if (data) {
+                return {
+                    flow_pulses_per_minute: data.flow_pulses_per_minute || 0,
+                    flow_updated_at: data.flow_updated_at || null
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error('Erro ao buscar dados do fluxo:', error);
+            return null;
+        }
+    }
+
     // Obter dados da última chegada da COMPESA
     async getLastCompesaData() {
         try {

@@ -229,9 +229,43 @@ class WaterMonitorApp {
                         updateElement.textContent = 'Aguardando dados...';
                     }
                 }
+
+                // Atualizar dados do fluxo
+                await this.updateFlowData();
             }
         } catch (error) {
             console.error('Erro ao atualizar nível atual:', error);
+        }
+    }
+
+    // Atualizar dados do sensor de fluxo
+    async updateFlowData() {
+        try {
+            const flowData = await firebaseService.getLatestFlowData();
+            
+            if (flowData) {
+                // Atualizar pulsos por minuto
+                const flowPulsesElement = document.getElementById('flowPulses');
+                if (flowPulsesElement) {
+                    flowPulsesElement.textContent = flowData.flow_pulses_per_minute || 0;
+                }
+
+                // Atualizar última atualização do fluxo
+                const flowUpdateElement = document.getElementById('flowUpdate');
+                if (flowUpdateElement && flowData.flow_updated_at) {
+                    flowUpdateElement.textContent = `Última leitura: ${flowData.flow_updated_at}`;
+                } else if (flowUpdateElement) {
+                    flowUpdateElement.textContent = 'Aguardando dados...';
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar dados do fluxo:', error);
+            // Exibir valores padrão em caso de erro
+            const flowPulsesElement = document.getElementById('flowPulses');
+            const flowUpdateElement = document.getElementById('flowUpdate');
+            
+            if (flowPulsesElement) flowPulsesElement.textContent = '--';
+            if (flowUpdateElement) flowUpdateElement.textContent = 'Erro ao carregar';
         }
     }
 

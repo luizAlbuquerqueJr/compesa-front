@@ -988,3 +988,42 @@ footer p {
 .events-list::-webkit-scrollbar-thumb:hover {
     background: #2980b9;
 }
+
+/* Estilos para informações do fluxo no status card */
+.flow-info {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.flow-data {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.flow-label {
+    font-size: 0.9rem;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.flow-value {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.flow-unit {
+    font-size: 0.85rem;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+.flow-update {
+    font-size: 0.8rem;
+    color: #e8f4fd;
+    font-style: italic;
+    font-weight: 500;
+}
