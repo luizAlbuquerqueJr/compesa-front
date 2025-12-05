@@ -413,6 +413,9 @@ class FirebaseService {
             const timestamp = now.getTime();
             const date = this.getCurrentDate();
             
+            // Timestamp Unix em segundos (formato do Arduino)
+            const unixTimestamp = Math.floor(now.getTime() / 1000);
+            
             const pumpData = {
                 timestamp: timestamp,
                 date: this.formatDateTime(now),
@@ -429,6 +432,10 @@ class FirebaseService {
             // Atualizar status da bomba em latest
             await this.updatePumpStatus(true, timestamp);
             
+            // Atualizar last_manual_pump_on com timestamp Unix em segundos
+            await firebase.database().ref('latest/last_manual_pump_on').set(unixTimestamp);
+            console.log('✅ last_manual_pump_on atualizado:', unixTimestamp);
+            
             console.log('✅ Acionamento da bomba gravado:', pumpPath);
             return { success: true, timestamp, data: pumpData };
             
@@ -444,6 +451,9 @@ class FirebaseService {
             const now = new Date();
             const timestamp = now.getTime();
             const date = this.getCurrentDate();
+            
+            // Timestamp Unix em segundos (formato do Arduino)
+            const unixTimestamp = Math.floor(now.getTime() / 1000);
             
             // Buscar última ativação para calcular duração
             const lastActivation = await this.getLastPumpActivation();
@@ -482,6 +492,10 @@ class FirebaseService {
             
             // Atualizar status da bomba em latest
             await this.updatePumpStatus(false, timestamp);
+            
+            // Atualizar last_manual_pump_off com timestamp Unix em segundos
+            await firebase.database().ref('latest/last_manual_pump_off').set(unixTimestamp);
+            console.log('✅ last_manual_pump_off atualizado:', unixTimestamp);
             
             console.log('✅ Desligamento da bomba gravado:', pumpPath);
             return { success: true, timestamp, data: pumpData, duration: durationString };
