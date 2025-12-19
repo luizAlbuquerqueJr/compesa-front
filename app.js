@@ -338,31 +338,78 @@ class WaterMonitorApp {
     async updateEventsList() {
         try {
             // Usar os novos dados de chegadas da COMPESA
-            const compesaArrivals = await firebaseService.getCompesaArrivals(20);
+            const allArrivals = await firebaseService.getCompesaArrivals(0);
             
             const eventsList = document.getElementById('eventsList');
             if (!eventsList) return;
 
-            if (compesaArrivals.length === 0) {
+            // Filtrar apenas registros com water_ended definido (novo formato)
+            const newFormatArrivals = allArrivals.filter(a => a.waterEnded !== undefined && a.waterEnded !== null);
+            
+            // Ordenar por timestamp (mais antigo primeiro para parear corretamente)
+            const sorted = [...newFormatArrivals].sort((a, b) => a.timestamp - b.timestamp);
+            
+            // Parear início/fim em sequência
+            const pairs = [];
+            let currentStart = null;
+            
+            for (const record of sorted) {
+                if (record.waterEnded === false) {
+                    // Início de água
+                    currentStart = record;
+                } else if (record.waterEnded === true && currentStart) {
+                    // Fim de água - parear com início atual
+                    pairs.push({
+                        start: currentStart,
+                        end: record
+                    });
+                    currentStart = null;
+                }
+            }
+            
+            // Se há um início sem fim, adicionar como "em andamento"
+            if (currentStart) {
+                pairs.push({
+                    start: currentStart,
+                    end: null
+                });
+            }
+            
+            // Ordenar pares por timestamp de início (mais recente primeiro)
+            pairs.sort((a, b) => b.start.timestamp - a.start.timestamp);
+
+            if (pairs.length === 0) {
                 eventsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 20px;">Nenhuma chegada da COMPESA detectada ainda.</p>';
                 return;
             }
             
-            eventsList.innerHTML = compesaArrivals.map(arrival => `
+            // Formatar hora
+            const formatTime = (date) => {
+                return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            };
+            
+            // Renderizar pares
+            eventsList.innerHTML = pairs.slice(0, 20).map(pair => {
+                const startTime = formatTime(pair.start.date);
+                const endTime = pair.end ? formatTime(pair.end.date) : null;
+                const duration = pair.end ? pair.end.duration : null;
+                const pulses = pair.end ? pair.end.flowPulses : pair.start.flowPulses;
+                
+                return `
                 <div class="event-item fade-in">
                     <div>
-                        <div class="event-date">${arrival.formatted}</div>
+                        <div class="event-date">${pair.start.formatted}</div>
                         <div class="event-details">
-                            ${firebaseService.formatRelativeTime(arrival.date)} • 
-                            Aumento de ${arrival.increase}% (${arrival.previousLevel}% → ${arrival.newLevel}%)
+                            ${firebaseService.formatRelativeTime(pair.start.date)} • 
+                            ${startTime}${endTime ? ` → ${endTime}` : ' → ...'}${duration ? ` (${duration})` : ''}${pulses ? ` • ${pulses} pulsos` : ''}
                         </div>
                     </div>
                     <div class="event-actions">
-                        <div class="event-level">${arrival.newLevel}%</div>
-                        ${this.isAdminMode ? `<button class="delete-event-btn" onclick="app.deleteCompesaEvent(${arrival.timestamp}, '${arrival.dateStr}')" title="Excluir evento">🗑️</button>` : ''}
+                        ${duration ? `<div class="event-level" style="background: #27ae60;">${duration}</div>` : '<div class="event-level" style="background: #3498db;">🔄</div>'}
+                        ${this.isAdminMode ? `<button class="delete-event-btn" onclick="app.deleteCompesaEvent(${pair.start.timestamp}, '${pair.start.dateStr}')" title="Excluir evento">🗑️</button>` : ''}
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
 
         } catch (error) {
             console.error('Erro ao atualizar lista de eventos:', error);

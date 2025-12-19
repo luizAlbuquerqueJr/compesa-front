@@ -82,7 +82,10 @@ class FirebaseService {
                             newLevel: data.new_level,
                             increase: data.increase,
                             datetime: data.datetime,
-                            formatted: this.formatDateTime(dateObj)
+                            formatted: this.formatDateTime(dateObj),
+                            waterEnded: data.water_ended || false,
+                            duration: data.duration || null,
+                            flowPulses: data.flow_pulses || 0
                         });
                     }
                 }

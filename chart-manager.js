@@ -82,15 +82,58 @@ class ChartManager {
                 
                 // Linhas da COMPESA
                 if (this.showCompesaEvents && this.compesaArrivals.length) {
+                    // Ordenar por timestamp (mais antigo primeiro)
+                    const sortedArrivals = [...this.compesaArrivals].sort((a, b) => a.timestamp - b.timestamp);
                     
+                    // Separar por tipo:
+                    // - hasWaterEnded: registros novos que têm a propriedade water_ended definida
+                    // - legacyArrivals: registros antigos sem a propriedade (apenas linha vertical)
+                    const newFormatRecords = sortedArrivals.filter(c => c.waterEnded !== undefined && c.waterEnded !== null);
+                    const legacyArrivals = sortedArrivals.filter(c => c.waterEnded === undefined || c.waterEnded === null);
                     
-                    this.compesaArrivals.forEach((arrival, index) => {
+                    // Dos novos, separar início (false) e fim (true)
+                    const starts = newFormatRecords.filter(c => c.waterEnded === false);
+                    const ends = newFormatRecords.filter(c => c.waterEnded === true);
+                    
+                    // Sombreamento verde entre início e fim (apenas para novos registros)
+                    starts.forEach((start) => {
+                        // Encontrar o fim correspondente: o PRÓXIMO registro com water_ended=true após este início
+                        // e que não tenha outro início no meio
+                        const correspondingEnd = ends.find(end => {
+                            if (end.timestamp <= start.timestamp) return false;
+                            // Verificar se não há outro início entre este start e o end
+                            const hasStartInBetween = starts.some(s => 
+                                s.timestamp > start.timestamp && s.timestamp < end.timestamp
+                            );
+                            return !hasStartInBetween;
+                        });
+                        
+                        if (correspondingEnd) {
+                            const startX = xScale.getPixelForValue(start.timestamp);
+                            const endX = xScale.getPixelForValue(correspondingEnd.timestamp);
+                            
+                            // Desenhar área sombreada verde
+                            if (startX >= chartArea.left - 50 && endX >= chartArea.left && startX <= chartArea.right + 50) {
+                                const clampedStartX = Math.max(startX, chartArea.left);
+                                const clampedEndX = Math.min(endX, chartArea.right);
+                                
+                                if (clampedEndX > clampedStartX) {
+                                    ctx.fillStyle = 'rgba(39, 174, 96, 0.1)'; // Verde transparente (igual bomba)
+                                    ctx.fillRect(clampedStartX, chartArea.top, clampedEndX - clampedStartX, chartArea.bottom - chartArea.top);
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Linhas verticais para TODOS os inícios (novos + legado)
+                    const allStarts = [...starts, ...legacyArrivals].sort((a, b) => a.timestamp - b.timestamp);
+                    allStarts.forEach((arrival, index) => {
                         const x = xScale.getPixelForValue(arrival.timestamp);
                         
                         if (x >= chartArea.left && x <= chartArea.right) {
-                            // Linha vertical da COMPESA
+                            // Linha vertical da COMPESA (início)
                             ctx.strokeStyle = 'blue';
-                            ctx.lineWidth = 1;
+                            ctx.lineWidth = 2;
                             ctx.setLineDash([8, 4]);
                             ctx.beginPath();
                             ctx.moveTo(x, chartArea.top);
@@ -99,8 +142,8 @@ class ChartManager {
                             
                             // Verificar se deve mostrar o texto (distância > 100px da próxima chegada)
                             let showText = true;
-                            if (index < this.compesaArrivals.length - 1) {
-                                const nextX = xScale.getPixelForValue(this.compesaArrivals[index + 1].timestamp);
+                            if (index < allStarts.length - 1) {
+                                const nextX = xScale.getPixelForValue(allStarts[index + 1].timestamp);
                                 const distance = Math.abs(nextX - x);
                                 if (distance <= 100) {
                                     showText = false;
@@ -116,6 +159,21 @@ class ChartManager {
                                 const textY = chartArea.top - 8;
                                 ctx.fillText('💧 COMPESA', x, textY);
                             }
+                        }
+                    });
+                    
+                    // Linhas verticais para fim da água (cor mais clara, sem texto)
+                    ends.forEach((end) => {
+                        const x = xScale.getPixelForValue(end.timestamp);
+                        
+                        if (x >= chartArea.left && x <= chartArea.right) {
+                            ctx.strokeStyle = 'rgba(52, 152, 219, 0.6)'; // Azul mais claro
+                            ctx.lineWidth = 1;
+                            ctx.setLineDash([4, 4]);
+                            ctx.beginPath();
+                            ctx.moveTo(x, chartArea.top);
+                            ctx.lineTo(x, chartArea.bottom);
+                            ctx.stroke();
                         }
                     });
                 }
@@ -404,7 +462,11 @@ class ChartManager {
             // Buscar chegadas da COMPESA do Firebase
             const allArrivals = await firebaseService.getCompesaArrivals(0); // 0 = todos os dados
             this.compesaArrivals = this.filterArrivalsByPeriod(allArrivals, period);
-            console.log(`📊 Chegadas da COMPESA encontradas para ${period}:`, this.compesaArrivals.length);
+            
+            // Debug: separar início e fim da água
+            const starts = this.compesaArrivals.filter(c => !c.waterEnded);
+            const ends = this.compesaArrivals.filter(c => c.waterEnded);
+            console.log(`📊 COMPESA para ${period}: ${this.compesaArrivals.length} total (${starts.length} chegadas, ${ends.length} fins)`);
 
             // Buscar acionamentos da bomba
             this.pumpActivations = await firebaseService.getPumpActivations(period);
